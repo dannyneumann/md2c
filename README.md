@@ -29,6 +29,23 @@ Eine eigene Zeile `[TOC]` (oder `## [TOC]`) wird zum nativen Confluence-Inhaltsv
 
 ## Installation
 
+### Homebrew
+
+md2c ist ein CLI, deshalb eine Formula (kein Cask wie bei Mac-Apps):
+
+```bash
+brew tap dannyneumann/md2c https://github.com/dannyneumann/md2c
+brew install dannyneumann/md2c/md2c
+```
+
+Später aktualisieren:
+
+```bash
+brew upgrade dannyneumann/md2c/md2c
+```
+
+### Aus dem Quellcode
+
 ```bash
 make install
 ```
@@ -82,6 +99,7 @@ Jeder Push und jeder PR auf GitHub führt die Unit-Tests aus. Ist `main` grün, 
 - ein Semver-Tag `v0.x.y` (eigene Reihe, nicht die alten npm-Tags)
 - ein GitHub Release
 - Binaries für macOS und Linux (amd64/arm64) plus `SHA256SUMS`
+- ein Update von `Formula/md2c.rb` (Homebrew-Tap im selben Repo)
 
 Releases: https://github.com/dannyneumann/md2c/releases
 
