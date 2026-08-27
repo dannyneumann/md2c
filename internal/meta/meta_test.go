@@ -47,6 +47,20 @@ Hallo.
 	}
 }
 
+func TestExtractCommaPathWithSlash(t *testing.T) {
+	t.Parallel()
+	in := `<!-- space:DOC,path:Team/Notes,title:Lorem Ipsum -->
+# x
+`
+	got, _ := Extract(in)
+	if got.Space != "DOC" || got.Path != "Team/Notes" || got.Title != "Lorem Ipsum" {
+		t.Fatalf("got %+v", got)
+	}
+	if got.Destination() != "Team/Notes/Lorem Ipsum" {
+		t.Fatalf("destination %q", got.Destination())
+	}
+}
+
 func TestExtractHTMLCommentAndMultiline(t *testing.T) {
 	t.Parallel()
 	in := `<!--

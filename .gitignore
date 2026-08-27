@@ -44,5 +44,9 @@ tags
 .md2c.json
 .md2confluence-rc
 
+# Local publish fixtures (not committed)
+tests/
+testing/
+
 # Temp conversion cache (legacy)
 tmp

@@ -53,9 +53,11 @@ Dateikopf (erste Zeile, wird nicht publiziert):
 Flags:
   -dry-run    Nur konvertieren, nicht publizieren (braucht keine Config)
   -version    Version, Quelle und Autor ausgeben
+  -config     Conf-Datei (Standard: ~/.config/md2c/md2c.conf)
+              z. B. --config=~/.config/md2c/md2c.conf
 
-Confluence-Zugang nur aus ~/.config/md2c/md2c.conf
-  (MD2C_BASE_URL, MD2C_USER, MD2C_TOKEN). Fehlt die Datei, bricht md2c ab.
+Confluence-Zugang nur aus der Conf-Datei (MD2C_BASE_URL, MD2C_USER, MD2C_TOKEN).
+  Fehlt die Datei, bricht md2c ab.
 `
 
 type runtime struct {
@@ -108,6 +110,7 @@ func run(args []string, rt runtime) int {
 
 	dryRun := fs.Bool("dry-run", false, "Convert only; do not publish")
 	showVersion := fs.Bool("version", false, "Print version and exit")
+	configPath := fs.String("config", "", "Path to md2c.conf")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -152,6 +155,8 @@ func run(args []string, rt runtime) int {
 		return 1
 	}
 
+	fmt.Fprintf(rt.Stderr, "ziel: %s / %s\n", space, pagePath)
+
 	if *dryRun {
 		fmt.Fprintln(rt.Stdout, body)
 		return 0
@@ -161,6 +166,7 @@ func run(args []string, rt runtime) int {
 		Getenv: rt.Getenv,
 		Read:   rt.ReadFile,
 		Home:   rt.Home,
+		Path:   *configPath,
 	})
 	if err != nil {
 		fmt.Fprintf(rt.Stderr, "error: %v\n", err)
@@ -171,6 +177,7 @@ func run(args []string, rt runtime) int {
 	}
 
 	client := confluence.New(cfg.BaseURL, cfg.User, cfg.Token)
+	client.Auth = cfg.Auth
 	if rt.HTTPClient != nil {
 		client.HTTPClient = rt.HTTPClient
 	}

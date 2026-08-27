@@ -46,6 +46,9 @@ func TestRunUsage(t *testing.T) {
 	if !strings.Contains(stderr.String(), "space:") {
 		t.Fatalf("missing file metadata: %s", stderr)
 	}
+	if !strings.Contains(stderr.String(), "-config") {
+		t.Fatalf("missing config flag: %s", stderr)
+	}
 }
 
 func TestRunDryRun(t *testing.T) {
@@ -98,8 +101,14 @@ Hallo **Welt**.
 	if code != 0 {
 		t.Fatalf("exit %d stderr %s", code, stderr)
 	}
+	if !strings.Contains(stderr.String(), "ziel:") {
+		t.Fatalf("missing target: %s", stderr)
+	}
+	if !strings.Contains(stderr.String(), "DOC") || !strings.Contains(stderr.String(), "Getting started") {
+		t.Fatalf("wrong target %s", stderr)
+	}
 	got := stdout.String()
-	if strings.Contains(got, "space:DOC") || strings.Contains(got, "DOC") {
+	if strings.Contains(got, "space:DOC") {
 		t.Fatalf("metadata leaked into body: %s", got)
 	}
 	if !strings.Contains(got, "<h1>Inhalt</h1>") {
@@ -169,7 +178,7 @@ Hello
 	writeConf(t, home, "MD2C_BASE_URL="+srv.URL+"\nMD2C_USER=me\nMD2C_TOKEN=token\n")
 
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
-	code := run([]string{path}, runtime{
+	code := run([]string{"--config=~/.config/md2c/md2c.conf", path}, runtime{
 		Stdout:     stdout,
 		Stderr:     stderr,
 		HTTPClient: srv.Client(),
@@ -286,6 +295,47 @@ func TestRunMissingCredentials(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "keine Config") {
 		t.Fatalf("stderr %s", stderr)
+	}
+}
+
+func TestRunPublishWithConfigFlag(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "note.md")
+	if err := os.WriteFile(path, []byte("Hello\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	conf := filepath.Join(home, "alt.conf")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = w.Write([]byte(`{"results":[],"size":0}`))
+		case http.MethodPost:
+			_, _ = w.Write([]byte(`{"id":"1","type":"page","title":"Hello","space":{"key":"DEV"},"version":{"number":1}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	if err := os.WriteFile(conf, []byte("MD2C_BASE_URL="+srv.URL+"\nMD2C_USER=me\nMD2C_TOKEN=token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	code := run([]string{"--config=~/alt.conf", path, "DEV", "Hello"}, runtime{
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Getenv:     func(string) string { return "" },
+		Home:       home,
+		Cwd:        dir,
+	})
+	if code != 0 {
+		t.Fatalf("exit %d stderr %s", code, stderr)
+	}
+	if !strings.Contains(stdout.String(), "published") {
+		t.Fatalf("stdout %s", stdout)
 	}
 }
 

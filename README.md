@@ -35,7 +35,7 @@ legt `md2c` nach `~/.local/bin/md2c`. `~/.local/bin` sollte in `PATH` stehen.
 
 ## Konfiguration
 
-Zugang **nur** aus `~/.config/md2c/md2c.conf`. Ohne diese Datei (oder ohne die Pflichtfelder) bricht `md2c` mit Fehler ab. Keine Shell-Env, kein Hardcode im Binary.
+Zugang **nur** aus einer Conf-Datei. Standard: `~/.config/md2c/md2c.conf`. Anderer Pfad per `-config` / `--config=~/.config/md2c/md2c.conf`. Ohne Datei (oder ohne die Pflichtfelder) bricht `md2c` mit Fehler ab. Keine Shell-Env, kein Hardcode im Binary.
 
 ```bash
 mkdir -p ~/.config/md2c
@@ -55,7 +55,7 @@ Für Confluence Cloud: Atlassian-E-Mail plus [API-Token](https://id.atlassian.co
 ## Aufruf
 
 ```text
-md2c [-dry-run] [-version] <datei> [<space> <pfad>]
+md2c [-dry-run] [-version] [-config pfad] <datei> [<space> <pfad>]
 ```
 
 ```bash
