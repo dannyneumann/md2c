@@ -2,10 +2,16 @@
 #
 #   mkdir -p ~/.config/md2c
 #   cp md2c.conf.example ~/.config/md2c/md2c.conf
+#
+# Anderer Pfad: md2c --config=~/.config/md2c/md2c.conf datei.md
 
 MD2C_BASE_URL=https://acme.atlassian.net
 MD2C_USER=you@acme.com
 MD2C_TOKEN=
+
+# Data Center / Server: Basic-Auth ist oft aus. Dann persönliches Zugriffstoken
+# und:
+# MD2C_AUTH=bearer
 
 # Optional info banner prepended to every published page:
 # MD2C_PREFIX=Diese Seite wird automatisch aus Markdown erzeugt.

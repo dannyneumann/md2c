@@ -24,7 +24,7 @@ func TestLoadFromConf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.BaseURL != "https://from-home.example" || cfg.User != "home-user" || cfg.Token != "home-token" || cfg.Prefix != "banner" {
+	if cfg.BaseURL != "https://from-home.example" || cfg.User != "home-user" || cfg.Token != "home-token" || cfg.Prefix != "banner" || cfg.Auth != "basic" {
 		t.Fatalf("got %+v", cfg)
 	}
 }
@@ -54,6 +54,26 @@ func TestLoadIgnoresProcessEnv(t *testing.T) {
 	}
 	if cfg.Token != "file-token" {
 		t.Fatalf("token %q (config must win, env ignored)", cfg.Token)
+	}
+}
+
+func TestLoadAuthBearer(t *testing.T) {
+	t.Parallel()
+	cfg, err := Load(Sources{
+		Home: "/home/me",
+		Read: func(path string) ([]byte, error) {
+			if path == "/home/me/.config/md2c/md2c.conf" {
+				return []byte("MD2C_BASE_URL=https://wiki.example\nMD2C_USER=me\nMD2C_TOKEN=pat\nMD2C_AUTH=bearer\n"), nil
+			}
+			return nil, errors.New("not found")
+		},
+		Getenv: func(string) string { return "" },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Auth != "bearer" {
+		t.Fatalf("auth %q", cfg.Auth)
 	}
 }
 
@@ -94,6 +114,41 @@ func TestParseEnvFile(t *testing.T) {
 	}
 	if got["MD2C_TOKEN"] != "ab=c" {
 		t.Fatalf("token %q", got["MD2C_TOKEN"])
+	}
+}
+
+func TestExpandPath(t *testing.T) {
+	t.Parallel()
+	home := "/home/me"
+	if got := ExpandPath("~/.config/md2c/md2c.conf", home); got != "/home/me/.config/md2c/md2c.conf" {
+		t.Fatalf("tilde %q", got)
+	}
+	if got := ExpandPath("/abs/md2c.conf", home); got != "/abs/md2c.conf" {
+		t.Fatalf("abs %q", got)
+	}
+	if got := ExpandPath("", home); got != "" {
+		t.Fatalf("empty %q", got)
+	}
+}
+
+func TestLoadExplicitPath(t *testing.T) {
+	t.Parallel()
+	cfg, err := Load(Sources{
+		Home: "/home/me",
+		Path: "~/.config/md2c/other.conf",
+		Read: func(path string) ([]byte, error) {
+			if path != "/home/me/.config/md2c/other.conf" {
+				t.Fatalf("path %q", path)
+			}
+			return []byte("MD2C_BASE_URL=https://other.example\nMD2C_USER=u\nMD2C_TOKEN=t\n"), nil
+		},
+		Getenv: func(string) string { return "" },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BaseURL != "https://other.example" {
+		t.Fatalf("got %+v", cfg)
 	}
 }
 

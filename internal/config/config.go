@@ -13,6 +13,7 @@ type Config struct {
 	User    string
 	Token   string
 	Prefix  string
+	Auth    string
 }
 
 // Sources are lookup hooks so tests can avoid the real filesystem.
@@ -20,6 +21,7 @@ type Sources struct {
 	Getenv func(string) string
 	Read   func(path string) ([]byte, error)
 	Home   string
+	Path   string
 }
 
 // Path is ~/.config/md2c/md2c.conf (or $XDG_CONFIG_HOME/md2c/md2c.conf).
@@ -34,8 +36,23 @@ func Path(home string, getenv func(string) string) string {
 	return filepath.Join(dir, "md2c.conf")
 }
 
-// Load reads ~/.config/md2c/md2c.conf. It does not use environment variables,
-// flags, or compile-time defaults. Missing file or missing keys are errors.
+// ExpandPath resolves ~ and ~/ against home. Other paths are returned trimmed.
+func ExpandPath(raw, home string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if raw == "~" {
+		return home
+	}
+	if strings.HasPrefix(raw, "~/") {
+		return filepath.Join(home, raw[2:])
+	}
+	return raw
+}
+
+// Load reads md2c.conf. Default path is ~/.config/md2c/md2c.conf unless Sources.Path
+// is set (CLI -config). It does not use process environment for credentials.
 func Load(src Sources) (Config, error) {
 	if src.Getenv == nil {
 		src.Getenv = os.Getenv
@@ -44,7 +61,10 @@ func Load(src Sources) (Config, error) {
 		src.Read = os.ReadFile
 	}
 
-	path := Path(src.Home, src.Getenv)
+	path := ExpandPath(src.Path, src.Home)
+	if path == "" {
+		path = Path(src.Home, src.Getenv)
+	}
 	raw, err := src.Read(path)
 	if err != nil {
 		return Config{}, fmt.Errorf("keine Config %s — anlegen mit MD2C_BASE_URL, MD2C_USER, MD2C_TOKEN (siehe md2c.conf.example)", path)
@@ -56,6 +76,7 @@ func Load(src Sources) (Config, error) {
 		User:    firstNonEmpty(kv["MD2C_USER"], kv["MD2CUSER"]),
 		Token:   firstNonEmpty(kv["MD2C_TOKEN"], kv["MD2C_PASS"], kv["MD2CPASS"]),
 		Prefix:  strings.TrimSpace(kv["MD2C_PREFIX"]),
+		Auth:    resolveAuth(kv["MD2C_AUTH"]),
 	}
 
 	var missing []string
@@ -82,6 +103,15 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func resolveAuth(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "bearer", "pat", "token":
+		return "bearer"
+	default:
+		return "basic"
+	}
 }
 
 func parseEnvFile(raw []byte) map[string]string {

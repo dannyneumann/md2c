@@ -46,6 +46,28 @@ func TestFindPageMissing(t *testing.T) {
 	}
 }
 
+func TestBearerAuth(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer pat-token" {
+			t.Errorf("authorization %q", r.Header.Get("Authorization"))
+		}
+		if _, _, ok := r.BasicAuth(); ok {
+			t.Errorf("unexpected basic auth")
+		}
+		_, _ = w.Write([]byte(`{"results":[],"size":0}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := testClient(srv)
+	c.Auth = "bearer"
+	c.Token = "pat-token"
+	_, err := c.FindPage(context.Background(), "DEV", "Onboarding")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPublishCreatesHierarchyThenUpdates(t *testing.T) {
 	t.Parallel()
 

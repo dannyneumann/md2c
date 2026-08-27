@@ -19,6 +19,7 @@ type Client struct {
 	BaseURL    string
 	User       string
 	Token      string
+	Auth       string
 	HTTPClient *http.Client
 	UserAgent  string
 }
@@ -68,6 +69,7 @@ func New(baseURL, user, token string) *Client {
 			Timeout: defaultTimeout,
 		},
 		UserAgent: "md2c",
+		Auth:      "basic",
 	}
 }
 
@@ -225,9 +227,13 @@ func (c *Client) do(ctx context.Context, method, path string, payload any, dest 
 	if err != nil {
 		return err
 	}
-	req.SetBasicAuth(c.User, c.Token)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Atlassian-Token", "no-check")
+	if strings.EqualFold(c.Auth, "bearer") {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	} else {
+		req.SetBasicAuth(c.User, c.Token)
+	}
 	if c.UserAgent != "" {
 		req.Header.Set("User-Agent", c.UserAgent)
 	}
@@ -265,7 +271,10 @@ func formatAPIError(status int, raw []byte) string {
 	}
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return fmt.Sprintf("HTTP %d (check MD2C_USER and MD2C_TOKEN): %s", status, msg)
+		if strings.Contains(msg, "Standardauthentifizierung") || strings.Contains(strings.ToLower(msg), "basic authentication") {
+			return fmt.Sprintf("HTTP %d: Basic-Auth ist auf dieser Instanz aus. In md2c.conf MD2C_AUTH=bearer setzen und ein Confluence-Zugriffstoken verwenden: %s", status, msg)
+		}
+		return fmt.Sprintf("HTTP %d (check MD2C_USER / MD2C_TOKEN / MD2C_AUTH): %s", status, msg)
 	default:
 		return fmt.Sprintf("HTTP %d: %s", status, msg)
 	}
