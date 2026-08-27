@@ -194,7 +194,18 @@ func (r *renderer) writeCode(n ast.Node) {
 		line := lines.At(i)
 		code.Write(line.Value(r.source))
 	}
-	body := strings.ReplaceAll(code.String(), "]]>", "]]]]><![CDATA[>")
+	src := code.String()
+	switch strings.ToLower(lang) {
+	case "mermaid":
+		if puml, ok := mermaidToPlantUML(src); ok {
+			r.writePlantUML(puml)
+			return
+		}
+	case "plantuml", "puml":
+		r.writePlantUML(src)
+		return
+	}
+	body := strings.ReplaceAll(src, "]]>", "]]]]><![CDATA[>")
 	fmt.Fprintf(&r.buf,
 		`<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">%s</ac:parameter><ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>`,
 		escapeAttr(lang), body)
@@ -214,6 +225,17 @@ func isTOCMarker(s string) bool {
 	default:
 		return false
 	}
+}
+
+func (r *renderer) writePlantUML(src string) {
+	src = strings.TrimSpace(src)
+	if !strings.Contains(strings.ToLower(src), "@startuml") {
+		src = "@startuml\n" + src + "\n@enduml\n"
+	}
+	body := strings.ReplaceAll(src, "]]>", "]]]]><![CDATA[>")
+	fmt.Fprintf(&r.buf,
+		`<ac:structured-macro ac:name="plantuml" ac:schema-version="1"><ac:parameter ac:name="atlassian-macro-output-type">INLINE</ac:parameter><ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>`,
+		body)
 }
 
 func (r *renderer) writeImage(dest, alt string) {
