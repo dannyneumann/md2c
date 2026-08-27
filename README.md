@@ -103,16 +103,6 @@ Jeder Push und jeder PR auf GitHub führt die Unit-Tests aus. Ist `main` grün, 
 
 Releases: https://github.com/dannyneumann/md2c/releases
 
-`main` hat **keine** klassische Branch Protection. Es gibt ein Ruleset `main` für den Default-Branch, das aber deaktiviert ist (`enforcement: disabled`). Aktiv würde es nur Löschen und Force-Push verhindern, keine Reviews und keine Status-Checks. Prüfung:
-
-```bash
-gh api repos/dannyneumann/md2c/branches/main --jq .protected
-gh api repos/dannyneumann/md2c/branches/main/protection
-gh api repos/dannyneumann/md2c/rulesets
-```
-
-Solange `main` ungeschützt ist, kann CI nach einem Release `Formula/md2c.rb` direkt nach `main` pushen. Ist das Ruleset an, braucht dieser Bot-Commit einen Bypass für GitHub Actions.
-
 ## FAQ
 
 **Nutzt md2c KI?**
