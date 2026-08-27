@@ -23,14 +23,14 @@ func TestRunVersion(t *testing.T) {
 	if got != versionBanner() {
 		t.Fatalf("stdout %q", got)
 	}
-	if !strings.Contains(got, "source "+source) {
-		t.Fatalf("missing source in %q", got)
+	if !strings.HasPrefix(got, "md2c ") {
+		t.Fatalf("missing name in %q", got)
 	}
-	if !strings.Contains(got, "optimized by "+author) {
-		t.Fatalf("missing author line in %q", got)
+	if strings.Contains(got, "source") || strings.Contains(got, "optimized by") {
+		t.Fatalf("banner should be name and version only: %q", got)
 	}
-	if strings.Contains(got, ".git") {
-		t.Fatalf("source should not use a .git suffix: %q", got)
+	if strings.Count(got, "\n") != 1 {
+		t.Fatalf("expected a single line, got %q", got)
 	}
 }
 
@@ -49,27 +49,6 @@ func repoRoot(t *testing.T) string {
 			t.Fatal("go.mod not found")
 		}
 		dir = parent
-	}
-}
-
-func TestSourceURLScript(t *testing.T) {
-	t.Parallel()
-	script := filepath.Join(repoRoot(t), "scripts", "source-url.sh")
-	tests := []struct{ in, want string }{
-		{"git@github.com:acme/md2c.git", "https://github.com/acme/md2c"},
-		{"https://github.com/acme/md2c.git", "https://github.com/acme/md2c"},
-		{"https://github.com/acme/md2c", "https://github.com/acme/md2c"},
-		{"ssh://git@github.com/acme/md2c.git", "https://github.com/acme/md2c"},
-	}
-	for _, tt := range tests {
-		out, err := exec.Command("sh", script, tt.in).Output()
-		if err != nil {
-			t.Fatalf("%s: %v", tt.in, err)
-		}
-		got := strings.TrimSpace(string(out))
-		if got != tt.want {
-			t.Fatalf("%s: got %q want %q", tt.in, got, tt.want)
-		}
 	}
 }
 
