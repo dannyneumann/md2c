@@ -20,7 +20,7 @@ import (
 
 var (
 	version = "dev"
-	source  = "https://github.com/dannyneumann/md2c.git"
+	source  = "https://github.com/dannyneumann/md2c"
 	author  = "Danny Neumann"
 )
 

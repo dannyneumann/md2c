@@ -1,6 +1,6 @@
 GO ?= go
-VERSION ?= $(shell git describe --tags --match 'v0.*' --always --dirty 2>/dev/null || cat VERSION 2>/dev/null || echo dev)
-SOURCE ?= $(shell git config --get remote.origin.url 2>/dev/null || echo https://github.com/dannyneumann/md2c.git)
+VERSION ?= $(shell sh scripts/version.sh)
+SOURCE ?= $(shell sh scripts/source-url.sh)
 LDFLAGS := -s -w -X 'main.version=$(VERSION)' -X 'main.source=$(SOURCE)'
 
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
@@ -51,7 +51,7 @@ install: build
 hooks:
 	mkdir -p .git/hooks
 	cp .githooks/pre-push .git/hooks/pre-push
-	chmod +x .git/hooks/pre-push scripts/next-version.sh
+	chmod +x .git/hooks/pre-push scripts/next-version.sh scripts/version.sh scripts/source-url.sh
 	@echo "installed .git/hooks/pre-push"
 
 tidy:
