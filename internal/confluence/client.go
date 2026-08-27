@@ -153,44 +153,45 @@ func (c *Client) UpdatePage(ctx context.Context, page *Page, storage string) (*P
 // Publish creates or updates the page at space/path. Intermediate path
 // segments become parent pages when they do not exist. The last segment is
 // the page title whose body is replaced with storage.
-func (c *Client) Publish(ctx context.Context, space, pagePath, storage string) (*Page, error) {
+// created is true when the leaf page did not exist yet.
+func (c *Client) Publish(ctx context.Context, space, pagePath, storage string) (page *Page, created bool, err error) {
 	segments := SplitPath(pagePath)
 	if len(segments) == 0 {
-		return nil, fmt.Errorf("path is empty")
+		return nil, false, fmt.Errorf("path is empty")
 	}
 
 	parentID := ""
 	for i, title := range segments {
 		leaf := i == len(segments)-1
-		page, err := c.FindPage(ctx, space, title)
+		existing, err := c.FindPage(ctx, space, title)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		if page == nil {
+		if existing == nil {
 			body := "<p></p>"
 			if leaf {
 				body = storage
 			}
-			created, err := c.CreatePage(ctx, space, title, parentID, body)
+			newPage, err := c.CreatePage(ctx, space, title, parentID, body)
 			if err != nil {
-				return nil, fmt.Errorf("create page %q: %w", title, err)
+				return nil, false, fmt.Errorf("create page %q: %w", title, err)
 			}
 			if leaf {
-				return created, nil
+				return newPage, true, nil
 			}
-			parentID = created.ID
+			parentID = newPage.ID
 			continue
 		}
 		if leaf {
-			updated, err := c.UpdatePage(ctx, page, storage)
+			updated, err := c.UpdatePage(ctx, existing, storage)
 			if err != nil {
-				return nil, fmt.Errorf("update page %q: %w", title, err)
+				return nil, false, fmt.Errorf("update page %q: %w", title, err)
 			}
-			return updated, nil
+			return updated, false, nil
 		}
-		parentID = page.ID
+		parentID = existing.ID
 	}
-	return nil, fmt.Errorf("publish: no leaf page")
+	return nil, false, fmt.Errorf("publish: no leaf page")
 }
 
 // SplitPath splits a Confluence page path on '/' and trims empty segments.
