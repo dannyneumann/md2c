@@ -44,7 +44,7 @@ jobs:
       - name: Build artifacts
         env:
           VERSION: ${{ steps.ver.outputs.tag }}
-          SOURCE: https://github.com/dannyneumann/md2c.git
+          SOURCE: https://github.com/${{ github.repository }}
         run: make dist
       - name: Release
         env:
