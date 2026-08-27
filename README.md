@@ -70,6 +70,10 @@ make build
 make install
 ```
 
+## Herkunft
+
+Go-Rewrite auf Basis von [md2confluence](https://github.com/jormar/md2confluence) von Jormar Arellano.
+
 ## Lizenz
 
-MIT
+MIT. Copyright 2016 Jormar Arellano; 2026 Danny Neumann.
