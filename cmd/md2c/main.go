@@ -52,6 +52,8 @@ Dateikopf (erste Zeile, wird nicht publiziert):
     <!-- space:DOC,path:Elternseite,title:Seitentitel -->
   path = Elternseite oder Hierarchie (a/b). title = Seite mit dem Inhalt.
 
+[TOC] oder ## [TOC] auf einer eigenen Zeile wird zum nativen Confluence-Inhaltsverzeichnis.
+
 Flags:
   -dry-run    Nur konvertieren, nicht publizieren (braucht keine Config)
   -version    Version, Quelle und Autor ausgeben

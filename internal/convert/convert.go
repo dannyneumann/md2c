@@ -50,8 +50,20 @@ func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
 	case *ast.Document:
 		return ast.WalkContinue, nil
 	case *ast.Heading:
+		if isTOCMarker(r.textContent(n)) {
+			if entering {
+				r.writeTOC()
+			}
+			return ast.WalkSkipChildren, nil
+		}
 		r.toggle(entering, fmt.Sprintf("h%d", n.Level))
 	case *ast.Paragraph:
+		if isTOCMarker(r.textContent(n)) {
+			if entering {
+				r.writeTOC()
+			}
+			return ast.WalkSkipChildren, nil
+		}
 		r.toggle(entering, "p")
 	case *ast.Emphasis:
 		if n.Level >= 2 {
@@ -186,6 +198,22 @@ func (r *renderer) writeCode(n ast.Node) {
 	fmt.Fprintf(&r.buf,
 		`<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">%s</ac:parameter><ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>`,
 		escapeAttr(lang), body)
+}
+
+func (r *renderer) writeTOC() {
+	r.buf.WriteString(`<ac:structured-macro ac:name="toc"></ac:structured-macro>`)
+}
+
+func isTOCMarker(s string) bool {
+	s = strings.TrimSpace(s)
+	s = strings.TrimLeft(s, "#")
+	s = strings.TrimSpace(s)
+	switch strings.ToLower(s) {
+	case "[toc]", "[[toc]]":
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *renderer) writeImage(dest, alt string) {
