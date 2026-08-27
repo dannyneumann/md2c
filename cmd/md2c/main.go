@@ -34,12 +34,12 @@ Aufruf:
 
 Normalfall: Ziel steht in der Datei, dann nur den Dateinamen angeben.
 
-    <!-- space:PSE,path:Decisions+Konzepte,title:Draft: Stagingkonzept -->
-    md2c konzept.md
+    <!-- space:DOC,path:Guides,title:Getting started -->
+    md2c page.md
 
 Fehlt space/path/title in der Datei, auf der Kommandozeile mitgeben:
 
-    md2c konzept.md PSE Decisions+Konzepte/Draft: Stagingkonzept
+    md2c page.md DOC Guides/Getting started
 
 Argumente:
   datei   Markdown-Datei
@@ -47,7 +47,7 @@ Argumente:
   pfad    Elternseiten/Seitentitel mit / (sonst path: und title: im Dateikopf)
 
 Dateikopf (erste Zeile, wird nicht publiziert):
-    <!-- space:PSE,path:Elternseite,title:Seitentitel -->
+    <!-- space:DOC,path:Elternseite,title:Seitentitel -->
   path = Elternseite oder Hierarchie (a/b). title = Seite mit dem Inhalt.
 
 Flags:

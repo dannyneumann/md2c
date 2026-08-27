@@ -7,17 +7,17 @@ import (
 
 func TestExtractShortCommaForm(t *testing.T) {
 	t.Parallel()
-	in := `<!-- space:PSE,path:Decisions+Konzepte,title:Draft: Stagingkonzept-Telematik-Anwendungen -->
+	in := `<!-- space:DOC,path:Guides,title:Getting started -->
 # Inhalt
 `
 	got, rest := Extract(in)
-	if got.Space != "PSE" || got.Path != "Decisions+Konzepte" {
+	if got.Space != "DOC" || got.Path != "Guides" {
 		t.Fatalf("got %+v", got)
 	}
-	if got.Title != "Draft: Stagingkonzept-Telematik-Anwendungen" {
+	if got.Title != "Getting started" {
 		t.Fatalf("title %q", got.Title)
 	}
-	if dest := got.Destination(); dest != "Decisions+Konzepte/Draft: Stagingkonzept-Telematik-Anwendungen" {
+	if dest := got.Destination(); dest != "Guides/Getting started" {
 		t.Fatalf("destination %q", dest)
 	}
 	if !strings.HasPrefix(rest, "# Inhalt") {
@@ -27,19 +27,19 @@ func TestExtractShortCommaForm(t *testing.T) {
 
 func TestExtractLegacyMetadataPrefix(t *testing.T) {
 	t.Parallel()
-	in := `<-- metadata.Space: PSE; metadata.Path: Decisions+Konzepte; metaData.Title: Draft: Stagingkonzept-Telematik-Anwendungen -->
+	in := `<-- metadata.Space: DOC; metadata.Path: Guides; metaData.Title: Getting started -->
 # Inhalt
 
 Hallo.
 `
 	got, rest := Extract(in)
-	if got.Space != "PSE" {
+	if got.Space != "DOC" {
 		t.Fatalf("space %q", got.Space)
 	}
-	if got.Path != "Decisions+Konzepte" {
+	if got.Path != "Guides" {
 		t.Fatalf("path %q", got.Path)
 	}
-	if got.Title != "Draft: Stagingkonzept-Telematik-Anwendungen" {
+	if got.Title != "Getting started" {
 		t.Fatalf("title %q", got.Title)
 	}
 	if rest != "# Inhalt\n\nHallo.\n" {
@@ -79,15 +79,15 @@ func TestExtractNone(t *testing.T) {
 
 func TestExtractTitleKeepsSpacesAndColon(t *testing.T) {
 	t.Parallel()
-	in := `<!-- space:PSE,path:Decisions+Konzepte,title: Draft: Stgingkonzept für die Applikationen in der Telematik -->
+	in := `<!-- space:DOC,path:Guides,title: Draft: Leitfaden für neue Anwendungen -->
 # x
 `
 	got, _ := Extract(in)
-	want := "Draft: Stgingkonzept für die Applikationen in der Telematik"
+	want := "Draft: Leitfaden für neue Anwendungen"
 	if got.Title != want {
 		t.Fatalf("title %q want %q", got.Title, want)
 	}
-	if got.Destination() != "Decisions+Konzepte/"+want {
+	if got.Destination() != "Guides/"+want {
 		t.Fatalf("destination %q", got.Destination())
 	}
 }

@@ -10,17 +10,17 @@ md2c <datei> <space> <pfad>
 Mit Dateikopf reicht der Dateiname:
 
 ```html
-<!-- space:PSE,path:Decisions+Konzepte,title:Draft: Stagingkonzept-Telematik-Anwendungen -->
+<!-- space:DOC,path:Guides,title:Getting started -->
 ```
 
 ```bash
-md2c konzept.md
+md2c page.md
 ```
 
 Ohne diese Zeile Space und Pfad angeben:
 
 ```bash
-md2c konzept.md PSE "Decisions+Konzepte/Draft: Stagingkonzept-Telematik-Anwendungen"
+md2c page.md DOC "Guides/Getting started"
 ```
 
 `path` ist die Elternseite (Hierarchie mit `/`), `title` die Seite mit dem Inhalt. Derselbe Pfad aktualisiert die Seite. Der Kommentar wird nicht publiziert.
@@ -59,7 +59,7 @@ md2c [-dry-run] [-version] <datei> [<space> <pfad>]
 ```
 
 ```bash
-md2c -dry-run konzept.md
+md2c -dry-run page.md
 ```
 
 ## Entwicklung
