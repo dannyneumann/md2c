@@ -20,6 +20,7 @@ build
 build/Release
 bin/md2c
 bin/md2c.exe
+dist/
 
 # Dependency directories
 node_modules

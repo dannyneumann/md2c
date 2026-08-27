@@ -68,7 +68,20 @@ md2c -dry-run page.md
 make test
 make build
 make install
+make hooks
 ```
+
+`make hooks` installiert einen pre-push-Hook: `git push` läuft nur, wenn `go test -race ./...` grün ist. Confluence wird in den Tests gemockt, es geht kein Netzverkehr raus.
+
+## CI und Releases
+
+Jeder Push und jeder PR auf GitHub führt die Unit-Tests aus. Ist `main` grün, entsteht automatisch:
+
+- ein Semver-Tag `v0.x.y` (eigene Reihe, nicht die alten npm-Tags)
+- ein GitHub Release
+- Binaries für macOS und Linux (amd64/arm64) plus `SHA256SUMS`
+
+Releases: https://github.com/dannyneumann/md2c/releases
 
 ## FAQ
 
