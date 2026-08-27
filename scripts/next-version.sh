@@ -10,4 +10,11 @@ if [ -z "$last" ]; then
 	echo v0.1.0
 	exit 0
 fi
+# Jump the 0.1 series to v0.2.0 once, then resume patch bumps (v0.2.1, …).
+case "$last" in
+v0.1.*)
+	echo v0.2.0
+	exit 0
+	;;
+esac
 echo "$last" | sed 's/^v//' | awk -F. '{printf "v%d.%d.%d\n", $1, $2, $3+1}'
