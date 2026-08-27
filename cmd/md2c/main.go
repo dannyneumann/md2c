@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"md2confluence/internal/confluence"
 	"md2confluence/internal/convert"
 	"md2confluence/internal/meta"
+	"md2confluence/internal/report"
 )
 
 var (
@@ -58,6 +60,9 @@ Flags:
 
 Confluence-Zugang nur aus der Conf-Datei (MD2C_BASE_URL, MD2C_USER, MD2C_TOKEN).
   Fehlt die Datei, bricht md2c ab.
+
+Ausgabe im Terminal: mehrzeilig und farbig (angelegt = grün, aktualisiert = cyan, Fehler = rot).
+NO_COLOR=1 schaltet die Farben ab.
 `
 
 type runtime struct {
@@ -115,6 +120,9 @@ func run(args []string, rt runtime) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+
+	colorOut := report.Enabled(rt.Stdout, rt.Getenv)
+	colorErr := report.Enabled(rt.Stderr, rt.Getenv)
 	if *showVersion {
 		fmt.Fprint(rt.Stdout, versionBanner())
 		return 0
@@ -123,7 +131,9 @@ func run(args []string, rt runtime) int {
 	rest := fs.Args()
 	if len(rest) < 1 || len(rest) > 3 {
 		fmt.Fprint(rt.Stderr, usageText)
-		fmt.Fprintf(rt.Stderr, "\nerror: erwartet <datei> oder <datei> <space> <pfad>, bekommen %d Argument(e)\n", len(rest))
+		fmt.Fprintln(rt.Stderr)
+		report.Failure(rt.Stderr, colorErr, "Aufruf ungültig",
+			fmt.Sprintf("erwartet <datei> oder <datei> <space> <pfad>, bekommen %d Argument(e)", len(rest)))
 		return 2
 	}
 
@@ -138,24 +148,24 @@ func run(args []string, rt runtime) int {
 
 	raw, err := rt.ReadFile(filePath)
 	if err != nil {
-		fmt.Fprintf(rt.Stderr, "error: read %s: %v\n", filePath, err)
+		report.Failure(rt.Stderr, colorErr, "Datei konnte nicht gelesen werden", fmt.Sprintf("%s: %v", filePath, err))
 		return 1
 	}
 
 	fileMeta, markdown := meta.Extract(string(raw))
 	space, pagePath, err := resolveTarget(cliSpace, cliPagePath, fileMeta)
 	if err != nil {
-		fmt.Fprintf(rt.Stderr, "error: %v\n", err)
+		report.Failure(rt.Stderr, colorErr, "Ziel unvollständig", err.Error())
 		return 2
 	}
 
 	body, err := convert.Convert(markdown)
 	if err != nil {
-		fmt.Fprintf(rt.Stderr, "error: convert markdown: %v\n", err)
+		report.Failure(rt.Stderr, colorErr, "Markdown konnte nicht konvertiert werden", err.Error())
 		return 1
 	}
 
-	fmt.Fprintf(rt.Stderr, "ziel: %s / %s\n", space, pagePath)
+	report.Target(rt.Stderr, colorErr, filepath.Base(filePath), space, pagePath)
 
 	if *dryRun {
 		fmt.Fprintln(rt.Stdout, body)
@@ -169,7 +179,7 @@ func run(args []string, rt runtime) int {
 		Path:   *configPath,
 	})
 	if err != nil {
-		fmt.Fprintf(rt.Stderr, "error: %v\n", err)
+		report.Failure(rt.Stderr, colorErr, "Konfiguration fehlt oder ist ungültig", err.Error())
 		return 2
 	}
 	if cfg.Prefix != "" {
@@ -186,17 +196,19 @@ func run(args []string, rt runtime) int {
 	ctx, cancel := context.WithTimeout(context.Background(), rt.Timeout)
 	defer cancel()
 
-	page, err := client.Publish(ctx, space, pagePath, body)
+	page, created, err := client.Publish(ctx, space, pagePath, body)
 	if err != nil {
-		fmt.Fprintf(rt.Stderr, "error: publish: %v\n", err)
+		report.Failure(rt.Stderr, colorErr, "Publizieren fehlgeschlagen", err.Error())
 		return 1
 	}
 
-	loc := page.WebURL()
-	if loc == "" {
-		loc = page.ID
-	}
-	fmt.Fprintf(rt.Stdout, "published %q to %s (%s)\n", page.Title, space, loc)
+	report.Success(rt.Stdout, colorOut, report.Result{
+		Created: created,
+		Title:   page.Title,
+		Version: page.Version.Number,
+		URL:     page.WebURL(),
+		ID:      page.ID,
+	})
 	return 0
 }
 

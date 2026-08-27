@@ -49,6 +49,9 @@ func TestRunUsage(t *testing.T) {
 	if !strings.Contains(stderr.String(), "-config") {
 		t.Fatalf("missing config flag: %s", stderr)
 	}
+	if !strings.Contains(stderr.String(), "NO_COLOR") {
+		t.Fatalf("missing color note: %s", stderr)
+	}
 }
 
 func TestRunDryRun(t *testing.T) {
@@ -101,7 +104,7 @@ Hallo **Welt**.
 	if code != 0 {
 		t.Fatalf("exit %d stderr %s", code, stderr)
 	}
-	if !strings.Contains(stderr.String(), "ziel:") {
+	if !strings.Contains(stderr.String(), "Ziel") {
 		t.Fatalf("missing target: %s", stderr)
 	}
 	if !strings.Contains(stderr.String(), "DOC") || !strings.Contains(stderr.String(), "Getting started") {
@@ -195,7 +198,10 @@ Hello
 	if titles[len(titles)-1] != "Getting started" {
 		t.Fatalf("leaf title %q in %v", titles[len(titles)-1], titles)
 	}
-	if !strings.Contains(stdout.String(), "DOC") {
+	if !strings.Contains(stderr.String(), "DOC") {
+		t.Fatalf("stderr %s", stderr)
+	}
+	if !strings.Contains(stdout.String(), "Seite angelegt") {
 		t.Fatalf("stdout %s", stdout)
 	}
 }
@@ -211,7 +217,7 @@ func TestRunMissingFile(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit %d", code)
 	}
-	if !strings.Contains(stderr.String(), "read") {
+	if !strings.Contains(stderr.String(), "Datei konnte nicht gelesen werden") {
 		t.Fatalf("stderr %s", stderr)
 	}
 }
@@ -267,11 +273,132 @@ func TestRunPublish(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d stderr %s", code, stderr)
 	}
-	if !strings.Contains(stdout.String(), "published") {
+	if !strings.Contains(stdout.String(), "Seite angelegt") {
 		t.Fatalf("stdout %s", stdout)
 	}
 	if !strings.Contains(stdout.String(), "https://acme.atlassian.net/wiki/spaces/DEV/pages/99/Hello") {
 		t.Fatalf("missing url: %s", stdout)
+	}
+	if strings.Contains(stdout.String(), "Seite aktualisiert") {
+		t.Fatalf("create looks like update: %s", stdout)
+	}
+}
+
+func TestRunPublishUpdate(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "note.md")
+	if err := os.WriteFile(path, []byte("Hello\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{{
+					"id":    "99",
+					"type":  "page",
+					"title": "Hello",
+					"space": map[string]string{"key": "DEV"},
+					"version": map[string]int{
+						"number": 3,
+					},
+					"_links": map[string]string{
+						"base":  "https://acme.atlassian.net/wiki",
+						"webui": "/spaces/DEV/pages/99/Hello",
+					},
+				}},
+				"size": 1,
+			})
+		case http.MethodPut:
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":    "99",
+				"type":  "page",
+				"title": "Hello",
+				"space": map[string]string{"key": "DEV"},
+				"version": map[string]int{
+					"number": 4,
+				},
+				"_links": map[string]string{
+					"base":  "https://acme.atlassian.net/wiki",
+					"webui": "/spaces/DEV/pages/99/Hello",
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	home := t.TempDir()
+	writeConf(t, home, "MD2C_BASE_URL="+srv.URL+"\nMD2C_USER=me\nMD2C_TOKEN=token\n")
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	code := run([]string{path, "DEV", "Hello"}, runtime{
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Getenv:     func(string) string { return "" },
+		Home:       home,
+		Cwd:        dir,
+	})
+	if code != 0 {
+		t.Fatalf("exit %d stderr %s", code, stderr)
+	}
+	got := stdout.String()
+	if !strings.Contains(got, "Seite aktualisiert") {
+		t.Fatalf("stdout %s", got)
+	}
+	if strings.Contains(got, "Seite angelegt") {
+		t.Fatalf("update looks like create: %s", got)
+	}
+	if !strings.Contains(got, "Version: 4") {
+		t.Fatalf("missing version: %s", got)
+	}
+	if !strings.Contains(stderr.String(), "Ziel") || !strings.Contains(stderr.String(), "DEV") {
+		t.Fatalf("missing target on stderr: %s", stderr)
+	}
+}
+
+func TestRunPublishError(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "note.md")
+	if err := os.WriteFile(path, []byte("Hello\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"message":"storage backend down"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	home := t.TempDir()
+	writeConf(t, home, "MD2C_BASE_URL="+srv.URL+"\nMD2C_USER=me\nMD2C_TOKEN=token\n")
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	code := run([]string{path, "DEV", "Hello"}, runtime{
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Getenv:     func(string) string { return "" },
+		Home:       home,
+		Cwd:        dir,
+	})
+	if code != 1 {
+		t.Fatalf("exit %d stdout %s stderr %s", code, stdout, stderr)
+	}
+	errOut := stderr.String()
+	if !strings.Contains(errOut, "Fehler: Publizieren fehlgeschlagen") {
+		t.Fatalf("stderr %s", errOut)
+	}
+	if !strings.Contains(errOut, "storage backend down") {
+		t.Fatalf("missing cause: %s", errOut)
+	}
+	if stdout.String() != "" {
+		t.Fatalf("stdout should be empty on error, got %q", stdout)
 	}
 }
 
@@ -334,7 +461,7 @@ func TestRunPublishWithConfigFlag(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d stderr %s", code, stderr)
 	}
-	if !strings.Contains(stdout.String(), "published") {
+	if !strings.Contains(stdout.String(), "Seite angelegt") {
 		t.Fatalf("stdout %s", stdout)
 	}
 }
@@ -382,7 +509,7 @@ func TestRunPublishFromHomeEnv(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d stderr %s", code, stderr)
 	}
-	if !strings.Contains(stdout.String(), "published") {
+	if !strings.Contains(stdout.String(), "Seite angelegt") {
 		t.Fatalf("stdout %s", stdout)
 	}
 }
