@@ -79,7 +79,7 @@ func TestRunDryRunFromMetadata(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "note.md")
-	src := `<!-- space:PSE,path:Decisions+Konzepte,title:Draft: Stagingkonzept-Telematik-Anwendungen -->
+	src := `<!-- space:DOC,path:Guides,title:Getting started -->
 # Inhalt
 
 Hallo **Welt**.
@@ -99,7 +99,7 @@ Hallo **Welt**.
 		t.Fatalf("exit %d stderr %s", code, stderr)
 	}
 	got := stdout.String()
-	if strings.Contains(got, "space:PSE") || strings.Contains(got, "PSE") {
+	if strings.Contains(got, "space:DOC") || strings.Contains(got, "DOC") {
 		t.Fatalf("metadata leaked into body: %s", got)
 	}
 	if !strings.Contains(got, "<h1>Inhalt</h1>") {
@@ -133,7 +133,7 @@ func TestRunPublishFromMetadata(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "note.md")
-	if err := os.WriteFile(path, []byte(`<!-- space:PSE,path:Decisions+Konzepte,title:Draft: Staging -->
+	if err := os.WriteFile(path, []byte(`<!-- space:DOC,path:Guides,title:Getting started -->
 Hello
 `), 0o600); err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ Hello
 				"id":    "7",
 				"type":  "page",
 				"title": title,
-				"space": map[string]string{"key": "PSE"},
+				"space": map[string]string{"key": "DOC"},
 				"version": map[string]int{
 					"number": 1,
 				},
@@ -183,10 +183,10 @@ Hello
 	if len(titles) < 2 {
 		t.Fatalf("expected parent + leaf create, got %v", titles)
 	}
-	if titles[len(titles)-1] != "Draft: Staging" {
+	if titles[len(titles)-1] != "Getting started" {
 		t.Fatalf("leaf title %q in %v", titles[len(titles)-1], titles)
 	}
-	if !strings.Contains(stdout.String(), "PSE") {
+	if !strings.Contains(stdout.String(), "DOC") {
 		t.Fatalf("stdout %s", stdout)
 	}
 }
