@@ -4,13 +4,14 @@ LDFLAGS := -s -w -X 'main.version=$(VERSION)'
 
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 
-.PHONY: help test lint build install dist hooks clean tidy
+.PHONY: help test lint build install dist homebrew hooks clean tidy
 
 help:
 	@echo "make test     Tests (race + coverage)"
 	@echo "make lint     golangci-lint (Docker, falls verfügbar)"
 	@echo "make build    Baut bin/md2c $(VERSION)"
 	@echo "make dist     Cross-compile nach dist/"
+	@echo "make homebrew Formula/md2c.rb aus dist/SHA256SUMS"
 	@echo "make install  Installiert nach $$HOME/.local/bin/md2c"
 	@echo "make hooks    Installiert pre-push (Unit-Tests vor git push)"
 	@echo "make tidy     go mod tidy"
@@ -41,6 +42,9 @@ dist:
 		GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 $(GO) build -ldflags "$(LDFLAGS)" -o "$$out" ./cmd/md2c; \
 	done
 	cd dist && { sha256sum md2c_$(VERSION)_* 2>/dev/null || shasum -a 256 md2c_$(VERSION)_*; } > SHA256SUMS
+
+homebrew:
+	$(GO) run ./cmd/update-homebrew-formula -version $(VERSION) -sums dist/SHA256SUMS -out Formula/md2c.rb
 
 install: build
 	mkdir -p "$(HOME)/.local/bin"
