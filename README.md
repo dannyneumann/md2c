@@ -72,11 +72,17 @@ make install
 
 ## FAQ
 
-**Nutzt md2c KI?** Nein. md2c ist ein lokales CLI. Es schickt Markdown nicht an ein Sprachmodell, sondern nur an deine Confluence-Instanz.
+**Nutzt md2c KI?**
 
-**Wohin gehen meine Daten?** Zugang liegt nur in `~/.config/md2c/md2c.conf` auf deinem Rechner. Publizierter Inhalt geht an Confluence. Es gibt kein Konto bei md2c und keinen Upload zu einem KI-Dienst.
+Nein. md2c ist ein lokales CLI. Es schickt Markdown nicht an ein Sprachmodell, sondern nur an deine Confluence-Instanz.
 
-**Wie ist der Code entstanden?** Die Go-Rewrite wurde mit KI-Assistenten in [Cursor](https://cursor.com) geschrieben und von Danny Neumann geprüft und gepflegt.
+**Wohin gehen meine Daten?**
+
+Zugang liegt nur in `~/.config/md2c/md2c.conf` auf deinem Rechner. Publizierter Inhalt geht an Confluence. Es gibt kein Konto bei md2c und keinen Upload zu einem KI-Dienst.
+
+**Wie ist der Code entstanden?**
+
+Die Go-Rewrite wurde mit KI-Assistenten in [Cursor](https://cursor.com) geschrieben und von Danny Neumann geprüft und gepflegt.
 
 **Built with**
 
