@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,6 +28,63 @@ func TestRunVersion(t *testing.T) {
 	}
 	if !strings.Contains(got, "optimized by "+author) {
 		t.Fatalf("missing author line in %q", got)
+	}
+	if strings.Contains(got, ".git") {
+		t.Fatalf("source should not use a .git suffix: %q", got)
+	}
+}
+
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("go.mod not found")
+		}
+		dir = parent
+	}
+}
+
+func TestSourceURLScript(t *testing.T) {
+	t.Parallel()
+	script := filepath.Join(repoRoot(t), "scripts", "source-url.sh")
+	tests := []struct{ in, want string }{
+		{"git@github.com:acme/md2c.git", "https://github.com/acme/md2c"},
+		{"https://github.com/acme/md2c.git", "https://github.com/acme/md2c"},
+		{"https://github.com/acme/md2c", "https://github.com/acme/md2c"},
+		{"ssh://git@github.com/acme/md2c.git", "https://github.com/acme/md2c"},
+	}
+	for _, tt := range tests {
+		out, err := exec.Command("sh", script, tt.in).Output()
+		if err != nil {
+			t.Fatalf("%s: %v", tt.in, err)
+		}
+		got := strings.TrimSpace(string(out))
+		if got != tt.want {
+			t.Fatalf("%s: got %q want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestVersionScript(t *testing.T) {
+	t.Parallel()
+	out, err := exec.Command("sh", filepath.Join(repoRoot(t), "scripts", "version.sh")).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.TrimSpace(string(out))
+	if !strings.HasPrefix(got, "v0.") {
+		t.Fatalf("version %q", got)
+	}
+	if strings.Contains(got, "-g") {
+		t.Fatalf("must not use git describe --always: %q", got)
 	}
 }
 
