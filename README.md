@@ -70,6 +70,20 @@ make build
 make install
 ```
 
+## FAQ
+
+**Nutzt md2c KI?** Nein. md2c ist ein lokales CLI. Es schickt Markdown nicht an ein Sprachmodell, sondern nur an deine Confluence-Instanz.
+
+**Wohin gehen meine Daten?** Zugang liegt nur in `~/.config/md2c/md2c.conf` auf deinem Rechner. Publizierter Inhalt geht an Confluence. Es gibt kein Konto bei md2c und keinen Upload zu einem KI-Dienst.
+
+**Wie ist der Code entstanden?** Die Go-Rewrite wurde mit KI-Assistenten in [Cursor](https://cursor.com) geschrieben und von Danny Neumann geprüft und gepflegt.
+
+**Built with**
+
+- Go CLI, Markdown-Konvertierung mit [goldmark](https://github.com/yuin/goldmark)
+- Entwicklung mit KI-Unterstützung in Cursor
+- Ausgangspunkt: [md2confluence](https://github.com/jormar/md2confluence) von Jormar Arellano
+
 ## Herkunft
 
 Go-Rewrite auf Basis von [md2confluence](https://github.com/jormar/md2confluence) von Jormar Arellano.
