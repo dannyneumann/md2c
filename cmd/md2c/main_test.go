@@ -52,6 +52,9 @@ func TestRunUsage(t *testing.T) {
 	if !strings.Contains(stderr.String(), "NO_COLOR") {
 		t.Fatalf("missing color note: %s", stderr)
 	}
+	if !strings.Contains(stderr.String(), "[TOC]") {
+		t.Fatalf("missing toc note: %s", stderr)
+	}
 }
 
 func TestRunDryRun(t *testing.T) {
