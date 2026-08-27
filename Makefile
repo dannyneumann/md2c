@@ -1,7 +1,6 @@
 GO ?= go
 VERSION ?= $(shell sh scripts/version.sh)
-SOURCE ?= $(shell sh scripts/source-url.sh)
-LDFLAGS := -s -w -X 'main.version=$(VERSION)' -X 'main.source=$(SOURCE)'
+LDFLAGS := -s -w -X 'main.version=$(VERSION)'
 
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 
@@ -51,7 +50,7 @@ install: build
 hooks:
 	mkdir -p .git/hooks
 	cp .githooks/pre-push .git/hooks/pre-push
-	chmod +x .git/hooks/pre-push scripts/next-version.sh scripts/version.sh scripts/source-url.sh
+	chmod +x .git/hooks/pre-push scripts/next-version.sh scripts/version.sh
 	@echo "installed .git/hooks/pre-push"
 
 tidy:
