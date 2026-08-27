@@ -1,0 +1,10 @@
+.git
+.direnv
+.env
+.env.local
+.envrc.local
+bin
+tmp
+.md2c.json
+.md2confluence-rc
+coverage.out

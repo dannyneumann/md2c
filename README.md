@@ -1,102 +1,75 @@
-# md2confluence
-Update confluence pages from your markdown files (like a README.md)
+# md2c
 
-## How to use it
-
-### Install the package
-
-You can safely install it as a global package:
+Publiziert eine Markdown-Datei als Confluence-Seite.
 
 ```bash
-npm install -g md2confluence
+md2c <datei>
+md2c <datei> <space> <pfad>
 ```
-This will allow you to use the command ```md2confluence``` anywhere.
 
-But, it's intended to development environments and I recommend to install it as dev dependency:
+Mit Dateikopf reicht der Dateiname:
+
+```html
+<!-- space:PSE,path:Decisions+Konzepte,title:Draft: Stagingkonzept-Telematik-Anwendungen -->
+```
 
 ```bash
-npm install --save-dev md2confluence
+md2c konzept.md
 ```
 
-...and excecuting it as a npm script.
-
-### Create the .md2confluence-rc file
-
-It's mandatory. It looks like:
-```javascript
-{
-  "baseUrl": "https://my.atlassian.net/wiki/rest/api",
-  "user": "my-user (Optional)",
-  "pass": "my-password (Optional)",
-  "prefix": "This document is automatically generated. Please don't edit it directly!",
-  "pages": [
-    {
-      "pageid": "37748761",
-      "mdfile": "README.md",
-      "title": "Optional title in the confluence page"
-    },
-    ...
-  ]
-}
-```
-
-**Basic Settings**
-
-| Key | Description |
-| --- | --- |
-| baseUrl | the Atlassian API url of confluence |
-| user | your confluence username. If you don't set any it will be prompt it |
-| pass | your confluence password. If you don't set any it will be prompt it |
-| prefix | OPTIONAL - a general information that is included at the top of the confluence page |
-| pages | a list of objects with the pages do you want to update |
-
-Each page object can define the following key value pairs.
-
-**Page Settings**
-
-| Key | Description |
-| --- | --- |
-| pageid | the page ID of the confluence page to update ([How to get Confluence page ID](https://confluence.atlassian.com/confkb/how-to-get-confluence-page-id-648380445.html)) |
-| mdfile | The path to the file in Markdown format with the content to update the page. It's relative to the dir where you run the command. |
-| title | the page title, if skipped the already defined page title will be kept.
-
-### Use Environmental Variables to store username and password
-
-If you wish to not use the config file to store your username and password, you may also use your Environmental Variables to do so. The name of the environmental variables must be as below:
-
-```
-Username = $MD2CUSER
-Password = $MD2CPASS
-```
-
-
-### Excecute as a node app
-
-You can use the command in the working directory (if it was installed globally):
+Ohne diese Zeile Space und Pfad angeben:
 
 ```bash
-md2confluence
+md2c konzept.md PSE "Decisions+Konzepte/Draft: Stagingkonzept-Telematik-Anwendungen"
 ```
 
-Or execute it from your node_modules in your working directory (installed locally):
+`path` ist die Elternseite (Hierarchie mit `/`), `title` die Seite mit dem Inhalt. Derselbe Pfad aktualisiert die Seite. Der Kommentar wird nicht publiziert.
+
+## Installation
 
 ```bash
-node_modules/.bin/md2confluence
+make install
 ```
 
-Or you can add this like a npm script in your package.json (recommended if it was installed as devDependencies):
+legt `md2c` nach `~/.local/bin/md2c`. `~/.local/bin` sollte in `PATH` stehen.
 
-```javascript
-{
-  ...
-  "scripts": {
-    "pushdoc": "md2confluence"
-  },
-  ...
-}
+## Konfiguration
+
+Zugang **nur** aus `~/.config/md2c/md2c.conf`. Ohne diese Datei (oder ohne die Pflichtfelder) bricht `md2c` mit Fehler ab. Keine Shell-Env, kein Hardcode im Binary.
+
+```bash
+mkdir -p ~/.config/md2c
+cp md2c.conf.example ~/.config/md2c/md2c.conf
 ```
 
+```bash
+MD2C_BASE_URL=https://acme.atlassian.net
+MD2C_USER=you@acme.com
+MD2C_TOKEN=dein-api-token
+```
 
-## Need new features?
+Für Confluence Cloud: Atlassian-E-Mail plus [API-Token](https://id.atlassian.com/manage-profile/security/api-tokens).
 
-Please, feel free to create any issues and pull request that you need.
+`MD2C_BASE_URL` akzeptiert die Site-URL, die Wiki-URL oder `.../rest/api`.
+
+## Aufruf
+
+```text
+md2c [-dry-run] [-version] <datei> [<space> <pfad>]
+```
+
+```bash
+md2c -dry-run konzept.md
+```
+
+## Entwicklung
+
+```bash
+make test
+make build
+make install
+```
+
+## Lizenz
+
+MIT

@@ -1,0 +1,11 @@
+# Confluence-Zugang. Pflicht: MD2C_BASE_URL, MD2C_USER, MD2C_TOKEN.
+#
+#   mkdir -p ~/.config/md2c
+#   cp md2c.conf.example ~/.config/md2c/md2c.conf
+
+MD2C_BASE_URL=https://acme.atlassian.net
+MD2C_USER=you@acme.com
+MD2C_TOKEN=
+
+# Optional info banner prepended to every published page:
+# MD2C_PREFIX=Diese Seite wird automatisch aus Markdown erzeugt.

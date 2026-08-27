@@ -1,10 +1,5 @@
-# How to contribute
+# Contributing
 
-For now, you can use any tool on Github for contribute in this project.
-
-Comming soon: a best explanation of this.
-
-## HowTo update the code
-
-1. Make your changes on lib/ files
-2. Run ```npm run build``` to generate the code on dist
+1. Create a task in Aven and a branch `task/<REF>-…` (never commit on `master`).
+2. Run `make test` and `make install`.
+3. Keep Confluence credentials in `~/.config/md2c/md2c.conf` (see `md2c.conf.example`).
