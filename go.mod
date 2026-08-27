@@ -2,4 +2,4 @@ module md2confluence
 
 go 1.24.0
 
-require github.com/yuin/goldmark v1.7.13
+require github.com/yuin/goldmark v1.8.5

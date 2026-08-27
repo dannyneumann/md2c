@@ -23,7 +23,7 @@ test:
 
 lint:
 	@if docker info >/dev/null 2>&1; then \
-		docker run --rm -v "$(CURDIR):/src" -w /src golangci/golangci-lint:v1.64.8 golangci-lint run; \
+		docker run --rm -v "$(CURDIR):/src" -w /src golangci/golangci-lint:v2.4.0 golangci-lint run; \
 	else \
 		echo "make lint braucht Docker" >&2; \
 		exit 1; \
