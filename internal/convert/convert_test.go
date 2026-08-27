@@ -80,6 +80,31 @@ func TestConvert(t *testing.T) {
 			in:   "- [x] done\n- [ ] todo\n",
 			want: "<ul><li>☑ done</li><li>☐ todo</li></ul>",
 		},
+		{
+			name: "toc paragraph",
+			in:   "[TOC]\n\n# Hello\n",
+			want: `<ac:structured-macro ac:name="toc"></ac:structured-macro><h1>Hello</h1>`,
+		},
+		{
+			name: "toc heading",
+			in:   "## [TOC]\n\n# Hello\n",
+			want: `<ac:structured-macro ac:name="toc"></ac:structured-macro><h1>Hello</h1>`,
+		},
+		{
+			name: "toc compact heading",
+			in:   "##[TOC]\n\n# Hello\n",
+			want: `<ac:structured-macro ac:name="toc"></ac:structured-macro><h1>Hello</h1>`,
+		},
+		{
+			name: "toc lowercase",
+			in:   "[toc]\n",
+			want: `<ac:structured-macro ac:name="toc"></ac:structured-macro>`,
+		},
+		{
+			name: "toc not in sentence",
+			in:   "See [TOC] in the docs.\n",
+			want: "<p>See [TOC] in the docs.</p>",
+		},
 	}
 
 	for _, tt := range tests {
