@@ -41,7 +41,7 @@ dist:
 		echo "$$out"; \
 		GOOS=$$os GOARCH=$$arch CGO_ENABLED=0 $(GO) build -ldflags "$(LDFLAGS)" -o "$$out" ./cmd/md2c; \
 	done
-	cd dist && { sha256sum md2c_* 2>/dev/null || shasum -a 256 md2c_*; } > SHA256SUMS
+	cd dist && { sha256sum md2c_$(VERSION)_* 2>/dev/null || shasum -a 256 md2c_$(VERSION)_*; } > SHA256SUMS
 
 install: build
 	mkdir -p "$(HOME)/.local/bin"
