@@ -25,6 +25,8 @@ md2c page.md DOC "Guides/Getting started"
 
 `path` ist die Elternseite (Hierarchie mit `/`), `title` die Seite mit dem Inhalt. Derselbe Pfad aktualisiert die Seite. Der Kommentar wird nicht publiziert.
 
+Eine eigene Zeile `[TOC]` (oder `## [TOC]`) wird zum nativen Confluence-Inhaltsverzeichnis. Fenced `mermaid`-Flowcharts werden als PlantUML-Makro publiziert.
+
 ## Installation
 
 ```bash
