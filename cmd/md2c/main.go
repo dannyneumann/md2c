@@ -20,12 +20,10 @@ import (
 
 var (
 	version = "dev"
-	source  = "https://github.com/dannyneumann/md2c"
-	author  = "Danny Neumann"
 )
 
 func versionBanner() string {
-	return fmt.Sprintf("md2c %s - source %s\noptimized by %s\n", version, source, author)
+	return fmt.Sprintf("md2c %s\n", version)
 }
 
 const usageText = `md2c — Markdown nach Confluence publizieren
