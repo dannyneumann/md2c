@@ -51,7 +51,8 @@ Dateikopf (erste Zeile, wird nicht publiziert):
   path = Elternseite oder Hierarchie (a/b). title = Seite mit dem Inhalt.
 
 [TOC] oder ## [TOC] auf einer eigenen Zeile wird zum nativen Confluence-Inhaltsverzeichnis.
-Mermaid-Flowcharts werden als PlantUML-Makro publiziert.
+GitHub Callouts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]) werden zu Confluence Info/Tip/Note/Warning-Makros.
+Tabellen (GFM-Standard) und Mermaid-Flowcharts werden nativ umgewandelt.
 
 Flags:
   -dry-run    Nur konvertieren, nicht publizieren (braucht keine Config)

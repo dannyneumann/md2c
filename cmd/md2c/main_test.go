@@ -92,6 +92,9 @@ func TestRunUsage(t *testing.T) {
 	if !strings.Contains(stderr.String(), "[TOC]") {
 		t.Fatalf("missing toc note: %s", stderr)
 	}
+	if !strings.Contains(stderr.String(), "[!NOTE]") {
+		t.Fatalf("missing callout note: %s", stderr)
+	}
 }
 
 func TestRunDryRun(t *testing.T) {
