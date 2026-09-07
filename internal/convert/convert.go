@@ -3,6 +3,7 @@ package convert
 import (
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -12,8 +13,8 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// Convert turns Markdown into Confluence storage format (XHTML + macros).
-func Convert(markdown string) (string, error) {
+// Convert turns Markdown into Confluence storage format (XHTML + macros) and collects referenced local attachments.
+func Convert(markdown string) (string, []string, error) {
 	source := []byte(markdown)
 	md := goldmark.New(goldmark.WithExtensions(extension.GFM))
 	doc := md.Parser().Parse(text.NewReader(source))
@@ -22,13 +23,13 @@ func Convert(markdown string) (string, error) {
 		callouts: make(map[*ast.Blockquote]string),
 	}
 	if err := ast.Walk(doc, r.walk); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	out := r.buf.String()
 	if strings.TrimSpace(out) == "" {
-		return "<p></p>", nil
+		return "<p></p>", r.attachments, nil
 	}
-	return out, nil
+	return out, r.attachments, nil
 }
 
 // InfoMacro wraps text in a Confluence info panel.
@@ -48,6 +49,7 @@ type renderer struct {
 	inHeader       bool
 	callouts       map[*ast.Blockquote]string
 	skipCalloutLen int
+	attachments    []string
 }
 
 func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -272,15 +274,31 @@ func (r *renderer) writePlantUML(src string) {
 
 func (r *renderer) writeImage(dest, alt string) {
 	if isRemoteURL(dest) {
-		fmt.Fprintf(&r.buf, `<ac:image ac:alt="%s"><ri:url ri:value="%s" /></ac:image>`,
-			escapeAttr(alt), escapeAttr(dest))
+		if alt != "" {
+			fmt.Fprintf(&r.buf, `<ac:image ac:alt="%s"><ri:url ri:value="%s" /></ac:image>`,
+				escapeAttr(alt), escapeAttr(dest))
+		} else {
+			fmt.Fprintf(&r.buf, `<ac:image><ri:url ri:value="%s" /></ac:image>`,
+				escapeAttr(dest))
+		}
 		return
 	}
-	label := dest
+
+	filename := filepath.Base(dest)
 	if alt != "" {
-		label = alt + " (" + dest + ")"
+		fmt.Fprintf(&r.buf, `<ac:image ac:alt="%s"><ri:attachment ri:filename="%s" /></ac:image>`,
+			escapeAttr(alt), escapeAttr(filename))
+	} else {
+		fmt.Fprintf(&r.buf, `<ac:image><ri:attachment ri:filename="%s" /></ac:image>`,
+			escapeAttr(filename))
 	}
-	fmt.Fprintf(&r.buf, "[image: %s]", escapeXML(label))
+
+	for _, att := range r.attachments {
+		if att == dest {
+			return
+		}
+	}
+	r.attachments = append(r.attachments, dest)
 }
 
 func (r *renderer) textContent(n ast.Node) string {

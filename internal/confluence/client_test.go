@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -208,6 +210,41 @@ func TestPublishEmptyPath(t *testing.T) {
 	_, _, err := c.Publish(context.Background(), "DEV", "  /  ", "<p></p>")
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestUploadAttachment(t *testing.T) {
+	t.Parallel()
+	uploaded := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Atlassian-Token") != "no-check" {
+			t.Errorf("missing X-Atlassian-Token header")
+		}
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/child/attachment") {
+			_, _ = w.Write([]byte(`{"results":[],"size":0}`))
+			return
+		}
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/child/attachment") {
+			uploaded = true
+			_, _ = w.Write([]byte(`{"results":[{"id":"att-1"}]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	c := testClient(srv)
+	dir := t.TempDir()
+	imgFile := filepath.Join(dir, "test.png")
+	if err := os.WriteFile(imgFile, []byte("fake image data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.UploadAttachment(context.Background(), "123", imgFile); err != nil {
+		t.Fatalf("UploadAttachment: %v", err)
+	}
+	if !uploaded {
+		t.Fatal("expected attachment to be posted")
 	}
 }
 
