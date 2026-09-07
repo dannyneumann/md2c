@@ -1,4 +1,4 @@
-<!-- template-version: dev-2026-08-25 -->
+<!-- template-version: dev-2026-08-29 -->
 # 🤖 AGENTS.md — Application Development & Engineering Guide
 
 **Template** for application/library repos. Stored in the dotfiles repo for
@@ -18,6 +18,56 @@ This document defines mandatory operational guidelines for automated AI agents (
 | **`CLAUDE.md`** | **Claude Code** | Symlink to `AGENTS.md` (`ln -sfn AGENTS.md CLAUDE.md`). |
 | **`.cursorrules`** / **`.cursor/rules/agents.mdc`** | **Cursor (CLI & IDE)** | Symlinks to `AGENTS.md`. |
 | **`GEMINI.md`** | **Gemini / Agy** | Symlink to `AGENTS.md` (`ln -sfn AGENTS.md GEMINI.md`). |
+
+---
+
+## 🔁 Session resume (`.last`)
+
+On **every session open** (before other work), update the repo-root file `.last`
+so the user can reopen this chat. **Only touch your own key.** Never replace
+the whole file if other keys already exist. Never commit `.last`.
+
+1. Resolve the git root (`git rev-parse --show-toplevel`, else `$PWD`). Path:
+   `<root>/.last`.
+2. If the file is missing, create it with empty slots:
+
+   ```text
+   cursor:
+   agy:
+   codex:
+   ```
+
+3. Identify yourself and write **only that line** (keep the others). If you
+   cannot determine this session's ID, skip the write — do not invent one.
+
+| Agent | You are this agent when | Line |
+| :--- | :--- | :--- |
+| **cursor** | `CURSOR_CONVERSATION_ID` is set | `cursor: cursor agent --resume=<id>` |
+| **agy** | Gemini CLI / Agy / Antigravity | `agy: agy --conversation <id>` |
+| **codex** | Codex CLI | `codex: codex resume <id>` |
+
+Cursor upsert (adapt `key` / `cmd` for agy and codex):
+
+```sh
+root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+file="$root/.last"
+key="cursor"
+id="${CURSOR_CONVERSATION_ID:-}"
+[ -n "$id" ] || exit 0
+cmd="cursor agent --resume=$id"
+if [ ! -f "$file" ]; then
+  printf 'cursor:\nagy:\ncodex:\n' > "$file"
+fi
+tmp="$(mktemp)"
+awk -v k="$key" -v cmd="$cmd" '
+  BEGIN { done=0 }
+  index($0, k ":") == 1 { print k ": " cmd; done=1; next }
+  { print }
+  END { if (!done) print k ": " cmd }
+' "$file" > "$tmp" && mv "$tmp" "$file"
+```
+
+If `.gitignore` does not list `.last`, add it.
 
 ---
 

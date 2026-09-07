@@ -17,7 +17,10 @@ func Convert(markdown string) (string, error) {
 	source := []byte(markdown)
 	md := goldmark.New(goldmark.WithExtensions(extension.GFM))
 	doc := md.Parser().Parse(text.NewReader(source))
-	r := &renderer{source: source}
+	r := &renderer{
+		source:   source,
+		callouts: make(map[*ast.Blockquote]string),
+	}
 	if err := ast.Walk(doc, r.walk); err != nil {
 		return "", err
 	}
@@ -40,9 +43,11 @@ func InfoMacro(text string) string {
 }
 
 type renderer struct {
-	source   []byte
-	buf      strings.Builder
-	inHeader bool
+	source         []byte
+	buf            strings.Builder
+	inHeader       bool
+	callouts       map[*ast.Blockquote]string
+	skipCalloutLen int
 }
 
 func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -112,7 +117,22 @@ func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
 	case *ast.TextBlock:
 		return ast.WalkContinue, nil
 	case *ast.Blockquote:
-		r.toggle(entering, "blockquote")
+		if entering {
+			if macro, skipLen := r.detectCallout(n); macro != "" {
+				r.callouts[n] = macro
+				r.skipCalloutLen = skipLen
+				fmt.Fprintf(&r.buf, `<ac:structured-macro ac:name="%s"><ac:rich-text-body>`, macro)
+			} else {
+				r.buf.WriteString("<blockquote>")
+			}
+		} else {
+			if _, ok := r.callouts[n]; ok {
+				r.buf.WriteString("</ac:rich-text-body></ac:structured-macro>")
+				delete(r.callouts, n)
+			} else {
+				r.buf.WriteString("</blockquote>")
+			}
+		}
 	case *ast.ThematicBreak:
 		if entering {
 			r.buf.WriteString("<hr />")
@@ -148,11 +168,23 @@ func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		}
 	case *ast.Text:
 		if entering {
-			r.buf.WriteString(escapeXML(string(n.Segment.Value(r.source))))
-			if n.HardLineBreak() {
-				r.buf.WriteString("<br />")
-			} else if n.SoftLineBreak() {
-				r.buf.WriteByte('\n')
+			val := string(n.Segment.Value(r.source))
+			if r.skipCalloutLen > 0 {
+				if len(val) <= r.skipCalloutLen {
+					r.skipCalloutLen -= len(val)
+					val = ""
+				} else {
+					val = val[r.skipCalloutLen:]
+					r.skipCalloutLen = 0
+				}
+			}
+			if len(val) > 0 {
+				r.buf.WriteString(escapeXML(val))
+				if n.HardLineBreak() {
+					r.buf.WriteString("<br />")
+				} else if n.SoftLineBreak() {
+					r.buf.WriteByte('\n')
+				}
 			}
 		}
 	case *ast.String:
@@ -337,3 +369,54 @@ func escapeAttr(s string) string {
 	s = strings.ReplaceAll(s, "'", "&apos;")
 	return s
 }
+
+func (r *renderer) detectCallout(n *ast.Blockquote) (macro string, skipLen int) {
+	child := n.FirstChild()
+	if child == nil {
+		return "", 0
+	}
+	var p ast.Node = child
+	if _, ok := p.(*ast.Paragraph); !ok {
+		if _, ok := p.(*ast.TextBlock); !ok {
+			return "", 0
+		}
+	}
+
+	text := r.textContent(p)
+	textTrimmed := strings.TrimSpace(text)
+	if !strings.HasPrefix(textTrimmed, "[!") {
+		return "", 0
+	}
+
+	idx := strings.Index(textTrimmed, "]")
+	if idx == -1 {
+		return "", 0
+	}
+
+	marker := strings.ToUpper(textTrimmed[2:idx])
+	switch marker {
+	case "NOTE", "INFO":
+		macro = "info"
+	case "TIP":
+		macro = "tip"
+	case "IMPORTANT":
+		macro = "note"
+	case "WARNING", "CAUTION", "ALERT":
+		macro = "warning"
+	default:
+		return "", 0
+	}
+
+	markerFull := textTrimmed[:idx+1]
+	origIdx := strings.Index(text, markerFull)
+	if origIdx == -1 {
+		return "", 0
+	}
+	end := origIdx + len(markerFull)
+	for end < len(text) && (text[end] == ' ' || text[end] == '\t' || text[end] == '\r' || text[end] == '\n') {
+		end++
+	}
+
+	return macro, end
+}
+
