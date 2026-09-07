@@ -355,6 +355,15 @@ func (c *Client) FetchPage(ctx context.Context, space, pagePath string) (page *P
 	return &p, p.Body.Storage.Value, pPath, nil
 }
 
+// siteRoot returns the Confluence base URL without /rest/api.
+func (c *Client) siteRoot() string {
+	b := strings.TrimRight(c.BaseURL, "/")
+	if i := strings.Index(b, "/rest/api"); i >= 0 {
+		return b[:i]
+	}
+	return b
+}
+
 // DownloadAttachmentFile downloads a page attachment file to targetPath.
 func (c *Client) DownloadAttachmentFile(ctx context.Context, pageID, filename, targetPath string) error {
 	reqPath := fmt.Sprintf("/content/%s/child/attachment?limit=200", url.PathEscape(pageID))
@@ -382,7 +391,10 @@ func (c *Client) DownloadAttachmentFile(ctx context.Context, pageID, filename, t
 	}
 
 	if !strings.HasPrefix(downloadURI, "http://") && !strings.HasPrefix(downloadURI, "https://") {
-		downloadURI = strings.TrimRight(c.BaseURL, "/") + downloadURI
+		if !strings.HasPrefix(downloadURI, "/") {
+			downloadURI = "/" + downloadURI
+		}
+		downloadURI = c.siteRoot() + downloadURI
 	}
 
 	if c.BaseURL == "" {
@@ -413,7 +425,7 @@ func (c *Client) DownloadAttachmentFile(ctx context.Context, pageID, filename, t
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("download attachment HTTP %d", resp.StatusCode)
+		return fmt.Errorf("download attachment HTTP %d from %s", resp.StatusCode, downloadURI)
 	}
 
 	out, err := os.Create(targetPath)

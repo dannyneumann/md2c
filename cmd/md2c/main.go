@@ -269,10 +269,10 @@ func handlePull(args []string, configPath string, colorOut, colorErr bool, rt ru
 		return 2
 	}
 
-	space, pagePath := "", ""
+	space, pagePath, rawURL := "", "", ""
 	if len(args) == 1 {
 		// URL or space/path
-		rawURL := args[0]
+		rawURL = args[0]
 		if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
 			// Parse space and title or page ID from URL e.g. .../spaces/PSE/pages/572179008/DRAFT+-+Nutzung+Confluence-Kalender
 			parts := strings.Split(rawURL, "/")
@@ -342,6 +342,9 @@ func handlePull(args []string, configPath string, colorOut, colorErr bool, rt ru
 	fullContent := header + markdown
 
 	outFile := page.Title + ".md"
+	_, statErr := os.Stat(outFile)
+	fileExisted := statErr == nil
+
 	if err := os.WriteFile(outFile, []byte(fullContent), 0644); err != nil {
 		report.Failure(rt.Stderr, colorErr, "Speichern fehlgeschlagen", err.Error())
 		return 1
@@ -356,18 +359,20 @@ func handlePull(args []string, configPath string, colorOut, colorErr bool, rt ru
 		}
 	}
 
-	fullPath := page.Title
-	if parentPath != "" {
-		fullPath = parentPath + "/" + page.Title
+	pullURL := page.WebURL()
+	if rawURL != "" {
+		pullURL = rawURL
 	}
 
-	report.Target(rt.Stderr, colorErr, outFile, space, fullPath)
-	report.Success(rt.Stdout, colorOut, report.Result{
-		Created:     false,
+	report.PullResult(rt.Stdout, colorOut, report.PullData{
+		URL:         pullURL,
+		Space:       page.Space.Key,
 		Title:       page.Title,
-		Version:     page.Version.Number,
-		URL:         page.WebURL(),
+		Path:        parentPath,
 		ID:          page.ID,
+		Version:     page.Version.Number,
+		LocalFile:   outFile,
+		FileExisted: fileExisted,
 		Attachments: downloadedAtts,
 	})
 	return 0

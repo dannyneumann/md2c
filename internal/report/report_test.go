@@ -12,7 +12,7 @@ func TestTarget(t *testing.T) {
 	Target(&b, false, "note.md", "PSE", "Decisions/Draft")
 	got := b.String()
 	wantLines := []string{
-		"Ziel",
+		"ZIEL",
 		"  Datei:   note.md",
 		"  Space:   PSE",
 		"  Pfad:    Decisions/Draft",
@@ -24,6 +24,41 @@ func TestTarget(t *testing.T) {
 	}
 	if strings.Count(got, "\n") < 5 {
 		t.Fatalf("expected multi-line target, got %q", got)
+	}
+}
+
+func TestPullResult(t *testing.T) {
+	t.Parallel()
+	var b strings.Builder
+	PullResult(&b, false, PullData{
+		URL:         "https://confluence.example/pages/123",
+		Space:       "PSE",
+		Title:       "Teamregeln",
+		Path:        "Leitplanken/Teamregeln",
+		ID:          "12345",
+		Version:     3,
+		LocalFile:   "Teamregeln.md",
+		FileExisted: false,
+		Attachments: []string{"diagram.png"},
+	})
+	got := b.String()
+	wantLines := []string{
+		"PULL https://confluence.example/pages/123",
+		"REMOTE",
+		"  Space:   PSE",
+		"  Titel:   Teamregeln",
+		"  Pfad:    Leitplanken/Teamregeln",
+		"  ID:      12345",
+		"  Version: 3",
+		"  Anhänge: diagram.png",
+		"LOKAL",
+		"  Datei:   Teamregeln.md",
+		"  Status:  Neu erstellt",
+	}
+	for _, line := range wantLines {
+		if !strings.Contains(got, line) {
+			t.Fatalf("missing %q in:\n%s", line, got)
+		}
 	}
 }
 

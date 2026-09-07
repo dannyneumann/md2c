@@ -144,7 +144,7 @@ func TestRunPull(t *testing.T) {
 	}
 	defer os.Remove("Onboarding.md")
 
-	if !strings.Contains(stdout.String(), "Seite") {
+	if !strings.Contains(stdout.String(), "PULL") {
 		t.Fatalf("stdout output missing summary: %s", stdout)
 	}
 }
@@ -199,7 +199,7 @@ Hallo **Welt**.
 	if code != 0 {
 		t.Fatalf("exit %d stderr %s", code, stderr)
 	}
-	if !strings.Contains(stderr.String(), "Ziel") {
+	if !strings.Contains(stderr.String(), "ZIEL") {
 		t.Fatalf("missing target: %s", stderr)
 	}
 	if !strings.Contains(stderr.String(), "DOC") || !strings.Contains(stderr.String(), "Getting started") {
@@ -451,7 +451,7 @@ func TestRunPublishUpdate(t *testing.T) {
 	if !strings.Contains(got, "Version: 4") {
 		t.Fatalf("missing version: %s", got)
 	}
-	if !strings.Contains(stderr.String(), "Ziel") || !strings.Contains(stderr.String(), "DEV") {
+	if !strings.Contains(stderr.String(), "ZIEL") || !strings.Contains(stderr.String(), "DEV") {
 		t.Fatalf("missing target on stderr: %s", stderr)
 	}
 }
