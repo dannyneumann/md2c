@@ -274,15 +274,21 @@ func handlePull(args []string, configPath string, colorOut, colorErr bool, rt ru
 		// URL or space/path
 		rawURL := args[0]
 		if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
-			// Parse space and title from URL e.g. .../spaces/PSE/pages/123/Title
+			// Parse space and title or page ID from URL e.g. .../spaces/PSE/pages/572179008/DRAFT+-+Nutzung+Confluence-Kalender
 			parts := strings.Split(rawURL, "/")
 			for i, p := range parts {
 				if strings.EqualFold(p, "spaces") && i+1 < len(parts) {
 					space = parts[i+1]
 				}
-				if strings.EqualFold(p, "pages") && i+2 < len(parts) {
-					pagePath = strings.ReplaceAll(parts[i+2], "+", " ")
-					pagePath, _ = url.QueryUnescape(pagePath)
+				if strings.EqualFold(p, "pages") && i+1 < len(parts) {
+					pagePath = parts[i+1]
+					if i+2 < len(parts) && parts[i+2] != "" {
+						tPart := strings.ReplaceAll(parts[i+2], "+", " ")
+						tPart, _ = url.QueryUnescape(tPart)
+						if tPart != "" {
+							pagePath = tPart
+						}
+					}
 				}
 			}
 		} else {

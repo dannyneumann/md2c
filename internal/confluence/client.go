@@ -296,13 +296,38 @@ func (c *Client) findAttachmentID(ctx context.Context, pageID, filename string) 
 	return "", nil
 }
 
-// FetchPage retrieves a page by space and title/path, expanding body.storage and ancestors.
+// FetchPage retrieves a page by space and title/path (or page ID), expanding body.storage and ancestors.
 func (c *Client) FetchPage(ctx context.Context, space, pagePath string) (page *Page, bodyStorage string, parentPath string, err error) {
 	segments := SplitPath(pagePath)
 	if len(segments) == 0 {
 		return nil, "", "", fmt.Errorf("path is empty")
 	}
 	leafTitle := segments[len(segments)-1]
+
+	var p Page
+
+	isID := len(leafTitle) > 0
+	for _, r := range leafTitle {
+		if r < '0' || r > '9' {
+			isID = false
+			break
+		}
+	}
+
+	if isID {
+		q := url.Values{}
+		q.Set("expand", "version,ancestors,space,_links,body.storage")
+		if err := c.do(ctx, http.MethodGet, "/content/"+url.PathEscape(leafTitle)+"?"+q.Encode(), nil, &p); err == nil && p.ID != "" {
+			var parentTitles []string
+			for _, anc := range p.Ancestors {
+				if anc.Title != "" {
+					parentTitles = append(parentTitles, anc.Title)
+				}
+			}
+			pPath := strings.Join(parentTitles, "/")
+			return &p, p.Body.Storage.Value, pPath, nil
+		}
+	}
 
 	q := url.Values{}
 	q.Set("spaceKey", space)
@@ -318,7 +343,7 @@ func (c *Client) FetchPage(ctx context.Context, space, pagePath string) (page *P
 		return nil, "", "", fmt.Errorf("page not found: %s / %s", space, leafTitle)
 	}
 
-	p := list.Results[0]
+	p = list.Results[0]
 	var parentTitles []string
 	for _, anc := range p.Ancestors {
 		if anc.Title != "" {
@@ -332,24 +357,36 @@ func (c *Client) FetchPage(ctx context.Context, space, pagePath string) (page *P
 
 // DownloadAttachmentFile downloads a page attachment file to targetPath.
 func (c *Client) DownloadAttachmentFile(ctx context.Context, pageID, filename, targetPath string) error {
-	q := url.Values{}
-	q.Set("filename", filename)
-	reqPath := fmt.Sprintf("/content/%s/child/attachment?%s", url.PathEscape(pageID), q.Encode())
+	reqPath := fmt.Sprintf("/content/%s/child/attachment?limit=200", url.PathEscape(pageID))
 	var list struct {
 		Results []struct {
+			Title string            `json:"title"`
 			Links map[string]string `json:"_links"`
 		} `json:"results"`
 	}
-	if err := c.do(ctx, http.MethodGet, reqPath, nil, &list); err != nil || len(list.Results) == 0 {
-		return fmt.Errorf("attachment metadata not found for %s", filename)
+
+	downloadURI := ""
+	if err := c.do(ctx, http.MethodGet, reqPath, nil, &list); err == nil {
+		for _, item := range list.Results {
+			if strings.EqualFold(item.Title, filename) || strings.EqualFold(filepath.Base(item.Title), filename) {
+				if d, ok := item.Links["download"]; ok && d != "" {
+					downloadURI = d
+					break
+				}
+			}
+		}
 	}
-	downloadURI := list.Results[0].Links["download"]
+
 	if downloadURI == "" {
-		return fmt.Errorf("no download link for attachment %s", filename)
+		downloadURI = fmt.Sprintf("/download/attachments/%s/%s", url.PathEscape(pageID), url.PathEscape(filename))
 	}
 
 	if !strings.HasPrefix(downloadURI, "http://") && !strings.HasPrefix(downloadURI, "https://") {
 		downloadURI = strings.TrimRight(c.BaseURL, "/") + downloadURI
+	}
+
+	if c.BaseURL == "" {
+		return fmt.Errorf("confluence base URL is not set")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURI, nil)
