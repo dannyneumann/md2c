@@ -66,9 +66,9 @@ func TestConvert(t *testing.T) {
 			want: `<p><ac:image ac:alt="Logo"><ri:url ri:value="https://example.com/logo.png" /></ac:image></p>`,
 		},
 		{
-			name: "local image placeholder",
+			name: "local image attachment",
 			in:   "![Logo](./logo.png)\n",
-			want: "<p>[image: Logo (./logo.png)]</p>",
+			want: `<p><ac:image ac:alt="Logo"><ri:attachment ri:filename="logo.png" /></ac:image></p>`,
 		},
 		{
 			name: "empty",
@@ -130,7 +130,7 @@ func TestConvert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := Convert(tt.in)
+			got, _, err := Convert(tt.in)
 			if err != nil {
 				t.Fatalf("Convert: %v", err)
 			}
@@ -138,6 +138,21 @@ func TestConvert(t *testing.T) {
 				t.Fatalf("got:\n%s\nwant:\n%s", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestConvertAttachments(t *testing.T) {
+	t.Parallel()
+	in := "![Arch](./images/arch.png)\n\n![Diagram](./images/arch.png)\n\n![Other](./logo.png)\n"
+	_, atts, err := Convert(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(atts) != 2 {
+		t.Fatalf("expected 2 unique attachments, got %d: %v", len(atts), atts)
+	}
+	if atts[0] != "./images/arch.png" || atts[1] != "./logo.png" {
+		t.Fatalf("unexpected attachments: %v", atts)
 	}
 }
 
@@ -157,7 +172,7 @@ func TestInfoMacro(t *testing.T) {
 
 func TestCDATAFence(t *testing.T) {
 	t.Parallel()
-	got, err := Convert("```\nfoo]]>bar\n```\n")
+	got, _, err := Convert("```\nfoo]]>bar\n```\n")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -192,6 +195,93 @@ func (c *Client) Publish(ctx context.Context, space, pagePath, storage string) (
 		parentID = existing.ID
 	}
 	return nil, false, fmt.Errorf("publish: no leaf page")
+}
+
+// UploadAttachment uploads a local file as a Confluence page attachment.
+func (c *Client) UploadAttachment(ctx context.Context, pageID, filePath string) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("open attachment %s: %w", filePath, err)
+	}
+	defer f.Close()
+
+	filename := filepath.Base(filePath)
+	existingID, err := c.findAttachmentID(ctx, pageID, filename)
+	if err != nil {
+		return err
+	}
+
+	var reqPath string
+	if existingID != "" {
+		reqPath = fmt.Sprintf("/content/%s/child/attachment/%s/data", url.PathEscape(pageID), url.PathEscape(existingID))
+	} else {
+		reqPath = fmt.Sprintf("/content/%s/child/attachment", url.PathEscape(pageID))
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(part, f); err != nil {
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+
+	if c.BaseURL == "" {
+		return fmt.Errorf("confluence base URL is not set")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+reqPath, body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Atlassian-Token", "no-check")
+	if strings.EqualFold(c.Auth, "bearer") {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	} else {
+		req.SetBasicAuth(c.User, c.Token)
+	}
+	if c.UserAgent != "" {
+		req.Header.Set("User-Agent", c.UserAgent)
+	}
+
+	if c.HTTPClient == nil {
+		c.HTTPClient = &http.Client{Timeout: defaultTimeout}
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload attachment HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
+}
+
+func (c *Client) findAttachmentID(ctx context.Context, pageID, filename string) (string, error) {
+	q := url.Values{}
+	q.Set("filename", filename)
+	reqPath := fmt.Sprintf("/content/%s/child/attachment?%s", url.PathEscape(pageID), q.Encode())
+
+	var list listResponse
+	if err := c.do(ctx, http.MethodGet, reqPath, nil, &list); err != nil {
+		return "", nil
+	}
+	if len(list.Results) > 0 {
+		return list.Results[0].ID, nil
+	}
+	return "", nil
 }
 
 // SplitPath splits a Confluence page path on '/' and trims empty segments.

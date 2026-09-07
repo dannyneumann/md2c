@@ -161,7 +161,7 @@ func run(args []string, rt runtime) int {
 		return 2
 	}
 
-	body, err := convert.Convert(markdown)
+	body, attachments, err := convert.Convert(markdown)
 	if err != nil {
 		report.Failure(rt.Stderr, colorErr, "Markdown konnte nicht konvertiert werden", err.Error())
 		return 1
@@ -202,6 +202,14 @@ func run(args []string, rt runtime) int {
 	if err != nil {
 		report.Failure(rt.Stderr, colorErr, "Publizieren fehlgeschlagen", err.Error())
 		return 1
+	}
+
+	mdDir := filepath.Dir(filePath)
+	for _, att := range attachments {
+		attPath := filepath.Join(mdDir, att)
+		if err := client.UploadAttachment(ctx, page.ID, attPath); err != nil {
+			report.Failure(rt.Stderr, colorErr, fmt.Sprintf("Attachment-Upload fehlgeschlagen (%s)", att), err.Error())
+		}
 	}
 
 	report.Success(rt.Stdout, colorOut, report.Result{

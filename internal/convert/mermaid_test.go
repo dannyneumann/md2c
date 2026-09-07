@@ -9,7 +9,7 @@ func TestMermaidToPlantUML(t *testing.T) {
 	t.Parallel()
 
 	src := "```mermaid\nflowchart LR\n    subgraph DEV[\"Team\"]\n        A[\"Start\"]\n        B[\"Ende\"]\n        A --> B\n    end\n    C[\"Aussen\"]\n    B -->|ok| C\n    A -.->|hint| C\n```\n"
-	got, err := Convert(src)
+	got, _, err := Convert(src)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestMermaidChainedEdges(t *testing.T) {
 
 func TestMermaidUnsupportedFallsBackToCode(t *testing.T) {
 	t.Parallel()
-	got, err := Convert("```mermaid\nsequenceDiagram\n    Alice->>Bob: hi\n```\n")
+	got, _, err := Convert("```mermaid\nsequenceDiagram\n    Alice->>Bob: hi\n```\n")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestMermaidInlineNodeOnEdge(t *testing.T) {
 
 func TestPlantUMLFence(t *testing.T) {
 	t.Parallel()
-	got, err := Convert("```plantuml\nAlice -> Bob: hi\n```\n")
+	got, _, err := Convert("```plantuml\nAlice -> Bob: hi\n```\n")
 	if err != nil {
 		t.Fatal(err)
 	}
