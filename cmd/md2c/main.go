@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,7 +53,8 @@ Dateikopf (erste Zeile, wird nicht publiziert):
 
 [TOC] oder ## [TOC] auf einer eigenen Zeile wird zum nativen Confluence-Inhaltsverzeichnis.
 GitHub Callouts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]) werden zu Confluence Info/Tip/Note/Warning-Makros.
-Tabellen (GFM-Standard) und Mermaid-Flowcharts werden nativ umgewandelt.
+Tabellen werden in GFM-Syntax erstellt (| Header 1 | Header 2 |\n| --- | --- |\n| Wert 1 | Wert 2 |) und als Confluence-Tabelle gerendert.
+Mermaid-Flowcharts werden als PlantUML-Makro publiziert.
 
 Flags:
   -dry-run    Nur konvertieren, nicht publizieren (braucht keine Config)
@@ -131,11 +133,15 @@ func run(args []string, rt runtime) int {
 	}
 
 	rest := fs.Args()
+	if len(rest) >= 1 && (rest[0] == "pull" || rest[0] == "download") {
+		return handlePull(rest[1:], *configPath, colorOut, colorErr, rt)
+	}
+
 	if len(rest) < 1 || len(rest) > 3 {
 		fmt.Fprint(rt.Stderr, usageText)
 		fmt.Fprintln(rt.Stderr)
 		report.Failure(rt.Stderr, colorErr, "Aufruf ungültig",
-			fmt.Sprintf("erwartet <datei> oder <datei> <space> <pfad>, bekommen %d Argument(e)", len(rest)))
+			fmt.Sprintf("erwartet <datei>, <datei> <space> <pfad> oder pull <space> <pfad>, bekommen %d Argument(e)", len(rest)))
 		return 2
 	}
 
@@ -247,4 +253,108 @@ func resolveTarget(cliSpace, cliPath string, m meta.Meta) (space, pagePath strin
 		return space, pagePath, nil
 	}
 	return "", "", fmt.Errorf("%s fehlt in der Datei — bitte angeben: md2c <datei> <space> <pfad>", strings.Join(missing, " und "))
+}
+
+func handlePull(args []string, configPath string, colorOut, colorErr bool, rt runtime) int {
+	if len(args) == 0 {
+		report.Failure(rt.Stderr, colorErr, "Pull-Aufruf unvollständig", "bitte Space und Pfad angeben: md2c pull <space> <pfad>")
+		return 2
+	}
+
+	space, pagePath := "", ""
+	if len(args) == 1 {
+		// URL or space/path
+		rawURL := args[0]
+		if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
+			// Parse space and title from URL e.g. .../spaces/PSE/pages/123/Title
+			parts := strings.Split(rawURL, "/")
+			for i, p := range parts {
+				if strings.EqualFold(p, "spaces") && i+1 < len(parts) {
+					space = parts[i+1]
+				}
+				if strings.EqualFold(p, "pages") && i+2 < len(parts) {
+					pagePath = strings.ReplaceAll(parts[i+2], "+", " ")
+					pagePath, _ = url.QueryUnescape(pagePath)
+				}
+			}
+		} else {
+			report.Failure(rt.Stderr, colorErr, "Pull-Aufruf ungültig", "bitte Space und Pfad angeben: md2c pull <space> <pfad>")
+			return 2
+		}
+	} else {
+		space = args[0]
+		pagePath = args[1]
+	}
+
+	if space == "" || pagePath == "" {
+		report.Failure(rt.Stderr, colorErr, "Pull-Ziel unvollständig", "Space oder Pfad konnte nicht ermittelt werden")
+		return 2
+	}
+
+	cfg, err := config.Load(config.Sources{
+		Getenv: rt.Getenv,
+		Read:   rt.ReadFile,
+		Home:   rt.Home,
+		Path:   configPath,
+	})
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Konfiguration fehlt oder ist ungültig", err.Error())
+		return 2
+	}
+
+	client := confluence.New(cfg.BaseURL, cfg.User, cfg.Token)
+	client.Auth = cfg.Auth
+	if rt.HTTPClient != nil {
+		client.HTTPClient = rt.HTTPClient
+	}
+	client.UserAgent = "md2c/" + version
+
+	ctx, cancel := context.WithTimeout(context.Background(), rt.Timeout)
+	defer cancel()
+
+	page, storageHTML, parentPath, err := client.FetchPage(ctx, space, pagePath)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Herunterladen fehlgeschlagen", err.Error())
+		return 1
+	}
+
+	markdown, attachments, err := convert.ToMarkdown(storageHTML)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Konvertierung fehlgeschlagen", err.Error())
+		return 1
+	}
+
+	header := fmt.Sprintf("<!-- space:%s,path:%s,title:%s -->\n\n", page.Space.Key, parentPath, page.Title)
+	fullContent := header + markdown
+
+	outFile := page.Title + ".md"
+	if err := os.WriteFile(outFile, []byte(fullContent), 0644); err != nil {
+		report.Failure(rt.Stderr, colorErr, "Speichern fehlgeschlagen", err.Error())
+		return 1
+	}
+
+	var downloadedAtts []string
+	for _, att := range attachments {
+		if err := client.DownloadAttachmentFile(ctx, page.ID, att, att); err != nil {
+			report.Failure(rt.Stderr, colorErr, fmt.Sprintf("Attachment-Download fehlgeschlagen (%s)", att), err.Error())
+		} else {
+			downloadedAtts = append(downloadedAtts, att)
+		}
+	}
+
+	fullPath := page.Title
+	if parentPath != "" {
+		fullPath = parentPath + "/" + page.Title
+	}
+
+	report.Target(rt.Stderr, colorErr, outFile, space, fullPath)
+	report.Success(rt.Stdout, colorOut, report.Result{
+		Created:     false,
+		Title:       page.Title,
+		Version:     page.Version.Number,
+		URL:         page.WebURL(),
+		ID:          page.ID,
+		Attachments: downloadedAtts,
+	})
+	return 0
 }
