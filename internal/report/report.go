@@ -9,13 +9,15 @@ import (
 )
 
 const (
-	reset = "\033[0m"
-	bold  = "\033[1m"
-	dim   = "\033[2m"
-	red   = "\033[31m"
-	green = "\033[32m"
-	cyan  = "\033[36m"
-	blue  = "\033[34m"
+	reset   = "\033[0m"
+	bold    = "\033[1m"
+	dim     = "\033[2m"
+	red     = "\033[31m"
+	green   = "\033[32m"
+	yellow  = "\033[33m"
+	blue    = "\033[34m"
+	magenta = "\033[35m"
+	cyan    = "\033[36m"
 )
 
 // Result holds the data for a publish summary.
@@ -26,6 +28,19 @@ type Result struct {
 	URL         string
 	ID          string
 	Attachments []string
+}
+
+// PullData holds details for a pull summary.
+type PullData struct {
+	URL          string
+	Space        string
+	Title        string
+	Path         string
+	ID           string
+	Version      int
+	LocalFile    string
+	FileExisted  bool
+	Attachments  []string
 }
 
 // Enabled reports whether ANSI colors should be used for w.
@@ -47,7 +62,7 @@ func Enabled(w io.Writer, getenv func(string) string) bool {
 
 // Target writes the destination before the Confluence call.
 func Target(w io.Writer, color bool, file, space, pagePath string) {
-	fmt.Fprintln(w, paint(color, bold, "Ziel"))
+	fmt.Fprintln(w, paint(color, bold+magenta, "ZIEL"))
 	fmt.Fprintln(w)
 	kv(w, color, "Datei", file)
 	kv(w, color, "Space", space)
@@ -55,7 +70,7 @@ func Target(w io.Writer, color bool, file, space, pagePath string) {
 	fmt.Fprintln(w)
 }
 
-// Success writes a multi-line create or update summary.
+// Success writes a multi-line create or update summary for publish.
 func Success(w io.Writer, color bool, r Result) {
 	headline := "Seite aktualisiert"
 	style := bold + cyan
@@ -77,6 +92,42 @@ func Success(w io.Writer, color bool, r Result) {
 	if len(r.Attachments) > 0 {
 		kv(w, color, "Anhänge", strings.Join(r.Attachments, ", "))
 	}
+	fmt.Fprintln(w)
+}
+
+// PullResult writes a clean summary after pulling a Confluence page.
+func PullResult(w io.Writer, color bool, p PullData) {
+	headline := "PULL CONFLUENCE SEITE"
+	if p.URL != "" {
+		headline = fmt.Sprintf("PULL %s", p.URL)
+	}
+	fmt.Fprintln(w, paint(color, bold+cyan, headline))
+	fmt.Fprintln(w)
+
+	fmt.Fprintln(w, paint(color, bold+yellow, "REMOTE"))
+	kv(w, color, "Space", p.Space)
+	kv(w, color, "Titel", p.Title)
+	if p.Path != "" {
+		kv(w, color, "Pfad", p.Path)
+	}
+	if p.ID != "" {
+		kv(w, color, "ID", p.ID)
+	}
+	if p.Version > 0 {
+		kv(w, color, "Version", strconv.Itoa(p.Version))
+	}
+	if len(p.Attachments) > 0 {
+		kv(w, color, "Anhänge", strings.Join(p.Attachments, ", "))
+	}
+	fmt.Fprintln(w)
+
+	fmt.Fprintln(w, paint(color, bold+green, "LOKAL"))
+	kv(w, color, "Datei", p.LocalFile)
+	status := "Neu erstellt"
+	if p.FileExisted {
+		status = "Aktualisiert"
+	}
+	kv(w, color, "Status", status)
 	fmt.Fprintln(w)
 }
 
