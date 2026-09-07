@@ -204,20 +204,24 @@ func run(args []string, rt runtime) int {
 		return 1
 	}
 
+	var uploadedAtts []string
 	mdDir := filepath.Dir(filePath)
 	for _, att := range attachments {
 		attPath := filepath.Join(mdDir, att)
 		if err := client.UploadAttachment(ctx, page.ID, attPath); err != nil {
 			report.Failure(rt.Stderr, colorErr, fmt.Sprintf("Attachment-Upload fehlgeschlagen (%s)", att), err.Error())
+		} else {
+			uploadedAtts = append(uploadedAtts, filepath.Base(att))
 		}
 	}
 
 	report.Success(rt.Stdout, colorOut, report.Result{
-		Created: created,
-		Title:   page.Title,
-		Version: page.Version.Number,
-		URL:     page.WebURL(),
-		ID:      page.ID,
+		Created:     created,
+		Title:       page.Title,
+		Version:     page.Version.Number,
+		URL:         page.WebURL(),
+		ID:          page.ID,
+		Attachments: uploadedAtts,
 	})
 	return 0
 }

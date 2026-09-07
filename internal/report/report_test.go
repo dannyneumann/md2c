@@ -61,10 +61,11 @@ func TestSuccessUpdated(t *testing.T) {
 	t.Parallel()
 	var b strings.Builder
 	Success(&b, false, Result{
-		Created: false,
-		Title:   "Draft",
-		Version: 12,
-		URL:     "https://wiki.example/draft",
+		Created:     false,
+		Title:       "Draft",
+		Version:     12,
+		URL:         "https://wiki.example/draft",
+		Attachments: []string{"img_1.png", "img_2.png"},
 	})
 	got := b.String()
 	if !strings.Contains(got, "Seite aktualisiert") {
@@ -75,6 +76,9 @@ func TestSuccessUpdated(t *testing.T) {
 	}
 	if !strings.Contains(got, "  Version: 12") {
 		t.Fatalf("missing version:\n%s", got)
+	}
+	if !strings.Contains(got, "  Anhänge: img_1.png, img_2.png") {
+		t.Fatalf("missing attachments:\n%s", got)
 	}
 }
 

@@ -20,11 +20,12 @@ const (
 
 // Result holds the data for a publish summary.
 type Result struct {
-	Created bool
-	Title   string
-	Version int
-	URL     string
-	ID      string
+	Created     bool
+	Title       string
+	Version     int
+	URL         string
+	ID          string
+	Attachments []string
 }
 
 // Enabled reports whether ANSI colors should be used for w.
@@ -72,6 +73,9 @@ func Success(w io.Writer, color bool, r Result) {
 		kv(w, color, "URL", paint(color, blue, r.URL))
 	} else if r.ID != "" {
 		kv(w, color, "ID", r.ID)
+	}
+	if len(r.Attachments) > 0 {
+		kv(w, color, "Anhänge", strings.Join(r.Attachments, ", "))
 	}
 	fmt.Fprintln(w)
 }
