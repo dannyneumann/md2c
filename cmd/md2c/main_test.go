@@ -97,6 +97,58 @@ func TestRunUsage(t *testing.T) {
 	}
 }
 
+func TestRunPull(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/content") {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{
+					{
+						"id":    "123",
+						"type":  "page",
+						"title": "Onboarding",
+						"space": map[string]string{"key": "DEV"},
+						"version": map[string]int{
+							"number": 1,
+						},
+						"body": map[string]any{
+							"storage": map[string]string{
+								"value": "<h1>Onboarding</h1><p>Welcome to the team.</p>",
+							},
+						},
+					},
+				},
+				"size": 1,
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	dir := t.TempDir()
+	confPath := filepath.Join(dir, "md2c.conf")
+	if err := os.WriteFile(confPath, []byte("MD2C_BASE_URL="+srv.URL+"\nMD2C_USER=me\nMD2C_TOKEN=token\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	code := run([]string{"--config=" + confPath, "pull", "DEV", "Onboarding"}, runtime{
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Home:       dir,
+	})
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, stderr)
+	}
+	defer os.Remove("Onboarding.md")
+
+	if !strings.Contains(stdout.String(), "Seite") {
+		t.Fatalf("stdout output missing summary: %s", stdout)
+	}
+}
+
 func TestRunDryRun(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

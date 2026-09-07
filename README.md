@@ -25,7 +25,15 @@ md2c page.md DOC "Guides/Getting started"
 
 `path` ist die Elternseite (Hierarchie mit `/`), `title` die Seite mit dem Inhalt. Derselbe Pfad aktualisiert die Seite. Der Kommentar wird nicht publiziert.
 
-Eine eigene Zeile `[TOC]` (oder `## [TOC]`) wird zum nativen Confluence-Inhaltsverzeichnis. GitHub-Style Callouts (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) werden in native Confluence Info-, Tipp-, Hinweis- und Warn-Makros umgewandelt. Standard GFM-Tabellen werden als Confluence-Tabellen gerendert. Lokale Bilddateien (`![alt](./path/image.png)`) werden automatisch aus dem Dateisystem an die Confluence-Seite hochgeladen. Fenced `mermaid`-Flowcharts werden als PlantUML-Makro publiziert.
+Eine eigene Zeile `[TOC]` (oder `## [TOC]`) wird zum nativen Confluence-Inhaltsverzeichnis. GitHub-Style Callouts (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) werden in native Confluence Info-, Tipp-, Hinweis- und Warn-Makros umgewandelt. Lokale Bilddateien (`![alt](./path/image.png)`) werden automatisch aus dem Dateisystem an die Confluence-Seite hochgeladen. Fenced `mermaid`-Flowcharts werden als PlantUML-Makro publiziert.
+
+Tabellen werden im GFM-Standard verfasst und als Confluence-Tabelle gerendert:
+
+```markdown
+| Spalte 1 | Spalte 2 |
+| -------- | -------- |
+| Wert A   | Wert B   |
+```
 
 ## Installation
 

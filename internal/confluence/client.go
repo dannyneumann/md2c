@@ -29,12 +29,24 @@ type Client struct {
 
 // Page is a Confluence content page.
 type Page struct {
-	ID      string  `json:"id"`
-	Type    string  `json:"type"`
-	Title   string  `json:"title"`
-	Space   Space   `json:"space"`
-	Version Version `json:"version"`
-	Links   Links   `json:"_links"`
+	ID        string   `json:"id"`
+	Type      string   `json:"type"`
+	Title     string   `json:"title"`
+	Space     Space    `json:"space"`
+	Version   Version  `json:"version"`
+	Links     Links    `json:"_links"`
+	Ancestors []Page   `json:"ancestors"`
+	Body      PageBody `json:"body"`
+}
+
+// PageBody holds the body representations of a page.
+type PageBody struct {
+	Storage StorageBody `json:"storage"`
+}
+
+// StorageBody holds the storage representation string.
+type StorageBody struct {
+	Value string `json:"value"`
 }
 
 // Space identifies a Confluence space.
@@ -282,6 +294,99 @@ func (c *Client) findAttachmentID(ctx context.Context, pageID, filename string) 
 		return list.Results[0].ID, nil
 	}
 	return "", nil
+}
+
+// FetchPage retrieves a page by space and title/path, expanding body.storage and ancestors.
+func (c *Client) FetchPage(ctx context.Context, space, pagePath string) (page *Page, bodyStorage string, parentPath string, err error) {
+	segments := SplitPath(pagePath)
+	if len(segments) == 0 {
+		return nil, "", "", fmt.Errorf("path is empty")
+	}
+	leafTitle := segments[len(segments)-1]
+
+	q := url.Values{}
+	q.Set("spaceKey", space)
+	q.Set("title", leafTitle)
+	q.Set("expand", "version,ancestors,space,_links,body.storage")
+	q.Set("limit", "1")
+
+	var list listResponse
+	if err := c.do(ctx, http.MethodGet, "/content?"+q.Encode(), nil, &list); err != nil {
+		return nil, "", "", err
+	}
+	if len(list.Results) == 0 {
+		return nil, "", "", fmt.Errorf("page not found: %s / %s", space, leafTitle)
+	}
+
+	p := list.Results[0]
+	var parentTitles []string
+	for _, anc := range p.Ancestors {
+		if anc.Title != "" {
+			parentTitles = append(parentTitles, anc.Title)
+		}
+	}
+	pPath := strings.Join(parentTitles, "/")
+
+	return &p, p.Body.Storage.Value, pPath, nil
+}
+
+// DownloadAttachmentFile downloads a page attachment file to targetPath.
+func (c *Client) DownloadAttachmentFile(ctx context.Context, pageID, filename, targetPath string) error {
+	q := url.Values{}
+	q.Set("filename", filename)
+	reqPath := fmt.Sprintf("/content/%s/child/attachment?%s", url.PathEscape(pageID), q.Encode())
+	var list struct {
+		Results []struct {
+			Links map[string]string `json:"_links"`
+		} `json:"results"`
+	}
+	if err := c.do(ctx, http.MethodGet, reqPath, nil, &list); err != nil || len(list.Results) == 0 {
+		return fmt.Errorf("attachment metadata not found for %s", filename)
+	}
+	downloadURI := list.Results[0].Links["download"]
+	if downloadURI == "" {
+		return fmt.Errorf("no download link for attachment %s", filename)
+	}
+
+	if !strings.HasPrefix(downloadURI, "http://") && !strings.HasPrefix(downloadURI, "https://") {
+		downloadURI = strings.TrimRight(c.BaseURL, "/") + downloadURI
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURI, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-Atlassian-Token", "no-check")
+	if strings.EqualFold(c.Auth, "bearer") {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	} else {
+		req.SetBasicAuth(c.User, c.Token)
+	}
+	if c.UserAgent != "" {
+		req.Header.Set("User-Agent", c.UserAgent)
+	}
+
+	if c.HTTPClient == nil {
+		c.HTTPClient = &http.Client{Timeout: defaultTimeout}
+	}
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("download attachment HTTP %d", resp.StatusCode)
+	}
+
+	out, err := os.Create(targetPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	return err
 }
 
 // SplitPath splits a Confluence page path on '/' and trims empty segments.
