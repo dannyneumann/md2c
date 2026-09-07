@@ -105,6 +105,26 @@ func TestConvert(t *testing.T) {
 			in:   "See [TOC] in the docs.\n",
 			want: "<p>See [TOC] in the docs.</p>",
 		},
+		{
+			name: "callout note multiline",
+			in:   "> [!NOTE]\n> Useful info here.\n",
+			want: `<ac:structured-macro ac:name="info"><ac:rich-text-body><p>Useful info here.</p></ac:rich-text-body></ac:structured-macro>`,
+		},
+		{
+			name: "callout warning inline",
+			in:   "> [!WARNING] Be careful!\n",
+			want: `<ac:structured-macro ac:name="warning"><ac:rich-text-body><p>Be careful!</p></ac:rich-text-body></ac:structured-macro>`,
+		},
+		{
+			name: "callout tip and important",
+			in:   "> [!TIP]\n> Pro tip.\n\n> [!IMPORTANT]\n> Key detail.\n",
+			want: `<ac:structured-macro ac:name="tip"><ac:rich-text-body><p>Pro tip.</p></ac:rich-text-body></ac:structured-macro><ac:structured-macro ac:name="note"><ac:rich-text-body><p>Key detail.</p></ac:rich-text-body></ac:structured-macro>`,
+		},
+		{
+			name: "callout caution and alert and info",
+			in:   "> [!CAUTION]\n> Dangerous.\n\n> [!ALERT]\n> Watch out.\n\n> [!INFO]\n> FYI.\n",
+			want: `<ac:structured-macro ac:name="warning"><ac:rich-text-body><p>Dangerous.</p></ac:rich-text-body></ac:structured-macro><ac:structured-macro ac:name="warning"><ac:rich-text-body><p>Watch out.</p></ac:rich-text-body></ac:structured-macro><ac:structured-macro ac:name="info"><ac:rich-text-body><p>FYI.</p></ac:rich-text-body></ac:structured-macro>`,
+		},
 	}
 
 	for _, tt := range tests {
