@@ -27,20 +27,26 @@ func versionBanner() string {
 	return fmt.Sprintf("md2c %s\n", version)
 }
 
-const usageText = `md2c — Markdown nach Confluence publizieren
+const usageText = `md2c — Markdown nach Confluence publizieren & herunterladen
 
 Aufruf:
   md2c [flags] <datei>
   md2c [flags] <datei> <space> <pfad>
 
-Normalfall: Ziel steht in der Datei, dann nur den Dateinamen angeben.
-
+  Normalfall: Ziel steht im Dateikopf (wird nicht publiziert):
     <!-- space:DOC,path:Guides,title:Getting started -->
     md2c page.md
 
-Fehlt space/path/title in der Datei, auf der Kommandozeile mitgeben:
-
+  Fehlt space/path/title in der Datei, auf der Kommandozeile mitgeben:
     md2c page.md DOC Guides/Getting started
+
+Aufruf (Download / Pull aus Confluence):
+  md2c pull <space> <pfad>
+  md2c pull <confluence-url>
+
+  Beispiele:
+    md2c pull PSE "Leitplanken/Nutzung-Kalender"
+    md2c pull https://confluence.example.com/spaces/PSE/pages/123/Nutzung-Kalender
 
 Argumente:
   datei   Markdown-Datei
@@ -49,12 +55,16 @@ Argumente:
 
 Dateikopf (erste Zeile, wird nicht publiziert):
     <!-- space:DOC,path:Elternseite,title:Seitentitel -->
-  path = Elternseite oder Hierarchie (a/b). title = Seite mit dem Inhalt.
 
-[TOC] oder ## [TOC] auf einer eigenen Zeile wird zum nativen Confluence-Inhaltsverzeichnis.
-GitHub Callouts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]) werden zu Confluence Info/Tip/Note/Warning-Makros.
-Tabellen werden in GFM-Syntax erstellt (| Header 1 | Header 2 |\n| --- | --- |\n| Wert 1 | Wert 2 |) und als Confluence-Tabelle gerendert.
-Mermaid-Flowcharts werden als PlantUML-Makro publiziert.
+Unterstützte Formatierungen:
+  - [TOC] oder ## [TOC] -> Natives Confluence-Inhaltsverzeichnis
+  - GitHub Callouts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]) -> Confluence Info/Tip/Note/Warning-Makros
+  - GFM-Tabellen:
+      | Header 1 | Header 2 |
+      | -------- | -------- |
+      | Wert 1   | Wert 2   |
+  - Mermaid-Flowcharts -> Confluence PlantUML-Makro
+  - Lokale Bilder (![alt](./bild.png)) -> Automatischer Attachment-Upload & Download
 
 Flags:
   -dry-run    Nur konvertieren, nicht publizieren (braucht keine Config)
@@ -63,9 +73,7 @@ Flags:
               z. B. --config=~/.config/md2c/md2c.conf
 
 Confluence-Zugang nur aus der Conf-Datei (MD2C_BASE_URL, MD2C_USER, MD2C_TOKEN).
-  Fehlt die Datei, bricht md2c ab.
-
-Ausgabe im Terminal: mehrzeilig und farbig (angelegt = grün, aktualisiert = cyan, Fehler = rot).
+Output im Terminal: farbig (angelegt = grün, aktualisiert = cyan, Fehler = rot).
 NO_COLOR=1 schaltet die Farben ab.
 `
 
