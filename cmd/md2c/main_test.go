@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"md2confluence/internal/meta"
 )
 
 func TestRunVersion(t *testing.T) {
@@ -933,6 +935,22 @@ func TestRunDiffCommand(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "--- Confluence Remote") || !strings.Contains(stdout.String(), "+++ Lokale Datei") {
 		t.Fatalf("stdout missing diff output: %s", stdout)
+	}
+}
+
+func TestResolveTargetWithConfluenceURL(t *testing.T) {
+	t.Parallel()
+	rawURL := "https://confluence.example.com/spaces/DEMO/pages/123456789/Example+ITSM+Request"
+	m, _ := meta.Extract("<!-- space:DEMO,path:Example Services,title:Example ITSM Request -->")
+	space, pagePath, err := resolveTarget(rawURL, "", m)
+	if err != nil {
+		t.Fatalf("resolveTarget failed: %v", err)
+	}
+	if space != "DEMO" {
+		t.Errorf("expected space DEMO, got %q", space)
+	}
+	if pagePath != "Example ITSM Request" {
+		t.Errorf("expected pagePath 'Example ITSM Request', got %q", pagePath)
 	}
 }
 
