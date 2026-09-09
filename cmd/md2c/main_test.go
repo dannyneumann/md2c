@@ -824,10 +824,12 @@ func TestRunPublishDiffOnly(t *testing.T) {
 
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
 	code := run([]string{path, "DEV", "Page", "--diff-only"}, runtime{
-		Home:   home,
-		Stdout: stdout,
-		Stderr: stderr,
-		Cwd:    dir,
+		Home:       home,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Getenv:     func(string) string { return "" },
+		Cwd:        dir,
 	})
 
 	if code != 0 {
@@ -870,10 +872,12 @@ func TestRunPublishFailOnRemoteChange(t *testing.T) {
 
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
 	code := run([]string{path, "DEV", "Page", "--fail-on-remote-change"}, runtime{
-		Home:   home,
-		Stdout: stdout,
-		Stderr: stderr,
-		Cwd:    dir,
+		Home:       home,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Getenv:     func(string) string { return "" },
+		Cwd:        dir,
 	})
 
 	if code != 1 {
