@@ -1,6 +1,7 @@
 GO ?= go
 VERSION ?= $(shell sh scripts/version.sh)
-DEV_VERSION ?= $(VERSION)-dev
+GIT_DESCRIBE := $(shell git describe --tags --always 2>/dev/null)
+DEV_VERSION ?= $(if $(GIT_DESCRIBE),$(GIT_DESCRIBE)-dev,$(VERSION)-dev)
 LDFLAGS := -s -w -X 'main.version=$(VERSION)'
 DEV_LDFLAGS := -s -w -X 'main.version=$(DEV_VERSION)'
 
