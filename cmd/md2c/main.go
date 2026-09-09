@@ -49,11 +49,16 @@ Aufruf (Download / Pull aus Confluence):
   md2c pull <space> <pfad>
   md2c pull <confluence-url>
 
+Aufruf (Diff remote Confluence vs. lokale Datei):
+  md2c diff <datei>
+  md2c diff <datei> <space> <pfad>
+
 Aufruf (Agent Skill installieren):
   md2c install-skill [target]
   Ziele: agy, gemini, codex, cursor, agents, all (Standard: all)
 
   Beispiele:
+    md2c diff page.md
     md2c lint page.md
     md2c install-skill codex
     md2c pull PSE "Leitplanken/Nutzung-Kalender"
@@ -198,6 +203,9 @@ func run(args []string, rt runtime) int {
 	}
 	if len(rest) >= 1 && rest[0] == "lint" {
 		return handleLint(rest[1:], colorOut, colorErr, rt)
+	}
+	if len(rest) >= 1 && rest[0] == "diff" {
+		return handleDiff(rest[1:], *configPath, colorOut, colorErr, rt)
 	}
 	if len(rest) >= 1 && (rest[0] == "pull" || rest[0] == "download") {
 		return handlePull(rest[1:], *configPath, colorOut, colorErr, rt)
@@ -548,6 +556,82 @@ func handleLint(args []string, colorOut, colorErr bool, rt runtime) int {
 	report.LintResult(rt.Stdout, colorOut, filePath, issueStrs, hasError)
 	if hasError {
 		return 1
+	}
+	return 0
+}
+
+func handleDiff(args []string, configPath string, colorOut, colorErr bool, rt runtime) int {
+	if len(args) < 1 || len(args) > 3 {
+		report.Failure(rt.Stderr, colorErr, "Diff-Aufruf ungültig", "Erwartet md2c diff <datei> oder md2c diff <datei> <space> <pfad>")
+		return 2
+	}
+
+	filePath := args[0]
+	cliSpace, cliPagePath := "", ""
+	if len(args) >= 2 {
+		cliSpace = args[1]
+	}
+	if len(args) == 3 {
+		cliPagePath = args[2]
+	}
+
+	raw, err := rt.ReadFile(filePath)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Datei konnte nicht gelesen werden", fmt.Sprintf("%s: %v", filePath, err))
+		return 1
+	}
+
+	fileMeta, markdown := meta.Extract(string(raw))
+	space, pagePath, err := resolveTarget(cliSpace, cliPagePath, fileMeta)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Ziel unvollständig", err.Error())
+		return 2
+	}
+
+	body, _, err := convert.Convert(markdown)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Markdown konnte nicht konvertiert werden", err.Error())
+		return 1
+	}
+
+	cfg, err := config.Load(config.Sources{
+		Getenv: rt.Getenv,
+		Read:   rt.ReadFile,
+		Home:   rt.Home,
+		Path:   configPath,
+	})
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Konfiguration fehlt oder ist ungültig", err.Error())
+		return 2
+	}
+	if cfg.Prefix != "" {
+		body = convert.InfoMacro(cfg.Prefix) + body
+	}
+
+	client := confluence.New(cfg.BaseURL, cfg.User, cfg.Token)
+	client.Auth = cfg.Auth
+	if rt.HTTPClient != nil {
+		client.HTTPClient = rt.HTTPClient
+	}
+	client.UserAgent = "md2c/" + version
+
+	ctx, cancel := context.WithTimeout(context.Background(), rt.Timeout)
+	defer cancel()
+
+	pubOpts := confluence.PublishOptions{
+		DiffOnly: true,
+	}
+
+	pubRes, err := client.PublishWithOptions(ctx, space, pagePath, body, "", pubOpts)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Diff fehlgeschlagen", err.Error())
+		return 1
+	}
+
+	if pubRes.RemoteDiffers {
+		confluence.PrintDiff(rt.Stdout, colorOut, pubRes.Diff)
+	} else {
+		fmt.Fprintln(rt.Stdout, "✓ Keine Abweichungen zwischen Confluence Remote und lokaler Datei.")
 	}
 	return 0
 }
