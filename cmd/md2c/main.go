@@ -386,6 +386,7 @@ func run(args []string, rt runtime) int {
 		Created:     created,
 		Title:       page.Title,
 		Version:     page.Version.Number,
+		Reason:      changeReason,
 		URL:         page.WebURL(),
 		ID:          page.ID,
 		Attachments: uploadedAtts,
