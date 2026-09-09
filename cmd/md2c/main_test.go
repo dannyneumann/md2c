@@ -609,6 +609,53 @@ func TestRunPublishFromHomeEnv(t *testing.T) {
 	}
 }
 
+func TestRunLintCommand(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "invalid.md")
+	if err := os.WriteFile(path, []byte("#InvalidHeading\n\n```go\nunclosed block\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	code := run([]string{"lint", path}, runtime{
+		Stdout: stdout,
+		Stderr: stderr,
+		Cwd:    dir,
+	})
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for invalid markdown, got %d", code)
+	}
+	if !strings.Contains(stdout.String(), "LINT SYNTAX / FEHLER") {
+		t.Fatalf("stdout missing lint header: %s", stdout)
+	}
+	if !strings.Contains(stdout.String(), "heading-space") || !strings.Contains(stdout.String(), "unclosed-code-block") {
+		t.Fatalf("stdout missing expected rules: %s", stdout)
+	}
+}
+
+func TestRunPublishFailsOnLintError(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "invalid.md")
+	if err := os.WriteFile(path, []byte("#NoSpaceHeading\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	code := run([]string{"-dry-run", path, "DEV", "Page"}, runtime{
+		Stdout: stdout,
+		Stderr: stderr,
+		Cwd:    dir,
+	})
+	if code != 1 {
+		t.Fatalf("expected exit code 1 when linting fails before dry-run/publish, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "Markdown-Linting fehlgeschlagen") {
+		t.Fatalf("stderr missing lint failure report: %s", stderr)
+	}
+}
+
 func writeConf(t *testing.T, home, body string) {
 	t.Helper()
 	dir := filepath.Join(home, ".config", "md2c")
