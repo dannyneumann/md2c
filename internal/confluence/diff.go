@@ -125,11 +125,12 @@ func contains(slice []string, val string) bool {
 	return false
 }
 
-// PrintDiff outputs a unified diff to w with optional color formatting.
+// PrintDiff outputs a compact unified diff to w with 3 lines of context (hunk headers) and optional color formatting.
 func PrintDiff(w io.Writer, color bool, diff []DiffLine) {
 	reset := "\033[0m"
 	red := "\033[31m"
 	green := "\033[32m"
+	cyan := "\033[36m"
 	dim := "\033[2m"
 	bold := "\033[1m"
 
@@ -142,14 +143,66 @@ func PrintDiff(w io.Writer, color bool, diff []DiffLine) {
 
 	fmt.Fprintln(w, paint(color, bold, "--- Confluence Remote"))
 	fmt.Fprintln(w, paint(color, bold, "+++ Lokale Datei"))
-	for _, line := range diff {
-		switch line.Type {
-		case '-':
-			fmt.Fprintln(w, paint(color, red, "- "+line.Content))
-		case '+':
-			fmt.Fprintln(w, paint(color, green, "+ "+line.Content))
-		default:
-			fmt.Fprintln(w, paint(color, dim, "  "+line.Content))
+
+	// Find indices of changed lines ('-' or '+')
+	changedIndices := make(map[int]bool)
+	for i, line := range diff {
+		if line.Type == '-' || line.Type == '+' {
+			changedIndices[i] = true
+		}
+	}
+
+	if len(changedIndices) == 0 {
+		return
+	}
+
+	const contextLines = 3
+	showLine := make(map[int]bool)
+	for idx := range changedIndices {
+		for c := idx - contextLines; c <= idx+contextLines; c++ {
+			if c >= 0 && c < len(diff) {
+				showLine[c] = true
+			}
+		}
+	}
+
+	// Print hunks with separator / context headers
+	inHunk := false
+	remoteLineNum, localLineNum := 1, 1
+
+	for i := 0; i < len(diff); i++ {
+		line := diff[i]
+		if showLine[i] {
+			if !inHunk {
+				inHunk = true
+				// Compute hunk start line numbers
+				remStart := remoteLineNum
+				locStart := localLineNum
+				fmt.Fprintln(w, paint(color, cyan, fmt.Sprintf("@@ -%d +%d @@", remStart, locStart)))
+			}
+			switch line.Type {
+			case '-':
+				fmt.Fprintln(w, paint(color, red, "- "+line.Content))
+				remoteLineNum++
+			case '+':
+				fmt.Fprintln(w, paint(color, green, "+ "+line.Content))
+				localLineNum++
+			default:
+				fmt.Fprintln(w, paint(color, dim, "  "+line.Content))
+				remoteLineNum++
+				localLineNum++
+			}
+		} else {
+			inHunk = false
+			switch line.Type {
+			case '-':
+				remoteLineNum++
+			case '+':
+				localLineNum++
+			default:
+				remoteLineNum++
+				localLineNum++
+			}
 		}
 	}
 }
