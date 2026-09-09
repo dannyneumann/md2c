@@ -18,6 +18,7 @@ import (
 	"md2confluence/internal/lint"
 	"md2confluence/internal/meta"
 	"md2confluence/internal/report"
+	"md2confluence/internal/skill"
 )
 
 var (
@@ -48,8 +49,13 @@ Aufruf (Download / Pull aus Confluence):
   md2c pull <space> <pfad>
   md2c pull <confluence-url>
 
+Aufruf (Agent Skill installieren):
+  md2c install-skill [target]
+  Ziele: agy, gemini, codex, cursor, agents, all (Standard: all)
+
   Beispiele:
     md2c lint page.md
+    md2c install-skill codex
     md2c pull PSE "Leitplanken/Nutzung-Kalender"
     md2c pull https://confluence.example.com/spaces/PSE/pages/123/Nutzung-Kalender
 
@@ -72,13 +78,14 @@ Unterstützte Formatierungen:
   - Lokale Bilder (![alt](./bild.png)) -> Automatischer Attachment-Upload & Download
 
 Flags:
-  -dry-run    Nur konvertieren, nicht publizieren (braucht keine Config)
-  -no-lint    Automatischen Markdown-Linter vor dem Publizieren überspringen
-  -reason     Grund/Kommentar für die Versionshistorie in Confluence angeben
-  -message    Alias für -reason
-  -version    Version, Quelle und Autor ausgeben
-  -config     Conf-Datei (Standard: ~/.config/md2c/md2c.conf)
-              z. B. --config=~/.config/md2c/md2c.conf
+  -dry-run       Nur konvertieren, nicht publizieren (braucht keine Config)
+  -no-lint       Automatischen Markdown-Linter vor dem Publizieren überspringen
+  -reason        Grund/Kommentar für die Versionshistorie in Confluence angeben
+  -message       Alias für -reason
+  -install-skill Agent Skill installieren (Ziele: agy, gemini, codex, cursor, all)
+  -version       Version, Quelle und Autor ausgeben
+  -config        Conf-Datei (Standard: ~/.config/md2c/md2c.conf)
+                 z. B. --config=~/.config/md2c/md2c.conf
 
 Confluence-Zugang nur aus der Conf-Datei (MD2C_BASE_URL, MD2C_USER, MD2C_TOKEN).
 Output im Terminal: farbig (angelegt = grün, aktualisiert = cyan, Fehler = rot).
@@ -139,6 +146,7 @@ func run(args []string, rt runtime) int {
 	configPath := fs.String("config", "", "Path to md2c.conf")
 	reason := fs.String("reason", "", "Version comment/reason in Confluence history")
 	message := fs.String("message", "", "Alias for -reason")
+	installSkillFlag := fs.String("install-skill", "", "Install agent skill (agy, gemini, codex, cursor, all)")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -156,7 +164,14 @@ func run(args []string, rt runtime) int {
 		return 0
 	}
 
+	if *installSkillFlag != "" {
+		return handleInstallSkill([]string{*installSkillFlag}, colorOut, colorErr, rt)
+	}
+
 	rest := fs.Args()
+	if len(rest) >= 1 && (rest[0] == "install-skill" || rest[0] == "install-skills") {
+		return handleInstallSkill(rest[1:], colorOut, colorErr, rt)
+	}
 	if len(rest) >= 1 && rest[0] == "lint" {
 		return handleLint(rest[1:], colorOut, colorErr, rt)
 	}
@@ -450,5 +465,32 @@ func handleLint(args []string, colorOut, colorErr bool, rt runtime) int {
 	if hasError {
 		return 1
 	}
+	return 0
+}
+
+func handleInstallSkill(args []string, colorOut, colorErr bool, rt runtime) int {
+	targetName := "all"
+	if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
+		targetName = args[0]
+	}
+
+	targets, err := skill.GetTargets(rt.Home, rt.Cwd, targetName)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Ungültiges Skill-Ziel", err.Error())
+		return 2
+	}
+
+	installed, err := skill.Install(targets)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Installation fehlgeschlagen", err.Error())
+		return 1
+	}
+
+	fmt.Fprintln(rt.Stdout, "✓ md2c Agent Skill erfolgreich installiert:")
+	fmt.Fprintln(rt.Stdout)
+	for _, p := range installed {
+		fmt.Fprintf(rt.Stdout, "  ➜ %s\n", p)
+	}
+	fmt.Fprintln(rt.Stdout)
 	return 0
 }
