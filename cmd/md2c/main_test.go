@@ -518,6 +518,69 @@ func TestRunPublishWithReason(t *testing.T) {
 	}
 }
 
+func TestRunPublishWithTrailingReason(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "note.md")
+	if err := os.WriteFile(path, []byte("Hello\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedReason string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{{
+					"id":      "99",
+					"type":    "page",
+					"title":   "Hello",
+					"space":   map[string]string{"key": "DEV"},
+					"version": map[string]int{"number": 1},
+				}},
+				"size": 1,
+			})
+		case http.MethodPut:
+			raw, _ := io.ReadAll(r.Body)
+			var payload map[string]any
+			_ = json.Unmarshal(raw, &payload)
+			if ver, ok := payload["version"].(map[string]any); ok {
+				capturedReason, _ = ver["message"].(string)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":      "99",
+				"type":    "page",
+				"title":   "Hello",
+				"space":   map[string]string{"key": "DEV"},
+				"version": map[string]int{"number": 2},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	home := t.TempDir()
+	writeConf(t, home, "MD2C_BASE_URL="+srv.URL+"\nMD2C_USER=me\nMD2C_TOKEN=token\n")
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	// Pass --reason AFTER the filename and arguments
+	code := run([]string{path, "DEV", "Hello", "--reason", "Trailing flag reason"}, runtime{
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Getenv:     func(string) string { return "" },
+		Home:       home,
+		Cwd:        dir,
+	})
+	if code != 0 {
+		t.Fatalf("exit %d stderr %s", code, stderr)
+	}
+	if capturedReason != "Trailing flag reason" {
+		t.Fatalf("expected version message 'Trailing flag reason', got %q", capturedReason)
+	}
+}
+
 func TestRunPublishError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

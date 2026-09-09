@@ -240,10 +240,11 @@ func TestUploadAttachment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.UploadAttachment(context.Background(), "123", imgFile); err != nil {
+	wasUploaded, err := c.UploadAttachment(context.Background(), "123", imgFile)
+	if err != nil {
 		t.Fatalf("UploadAttachment: %v", err)
 	}
-	if !uploaded {
+	if !wasUploaded || !uploaded {
 		t.Fatal("expected attachment to be posted")
 	}
 }

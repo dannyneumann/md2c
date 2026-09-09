@@ -29,14 +29,26 @@ type Client struct {
 
 // Page is a Confluence content page.
 type Page struct {
-	ID        string   `json:"id"`
-	Type      string   `json:"type"`
-	Title     string   `json:"title"`
-	Space     Space    `json:"space"`
-	Version   Version  `json:"version"`
-	Links     Links    `json:"_links"`
-	Ancestors []Page   `json:"ancestors"`
-	Body      PageBody `json:"body"`
+	ID         string     `json:"id"`
+	Type       string     `json:"type"`
+	Title      string     `json:"title"`
+	Space      Space      `json:"space"`
+	Version    Version    `json:"version"`
+	Links      Links      `json:"_links"`
+	Ancestors  []Page     `json:"ancestors"`
+	Body       PageBody   `json:"body"`
+	Extensions Extensions `json:"extensions"`
+}
+
+// Extensions holds extended metadata like media/file size and checksum.
+type Extensions struct {
+	Media MediaType `json:"media"`
+}
+
+// MediaType holds media extension properties.
+type MediaType struct {
+	FileSize int64  `json:"fileSize"`
+	MediaType string `json:"mediaType"`
 }
 
 // PageBody holds the body representations of a page.
@@ -101,7 +113,7 @@ func (c *Client) FindPage(ctx context.Context, space, title string) (*Page, erro
 	q := url.Values{}
 	q.Set("spaceKey", space)
 	q.Set("title", title)
-	q.Set("expand", "version,ancestors,space,_links")
+	q.Set("expand", "version,ancestors,space,_links,body.storage")
 	q.Set("limit", "1")
 
 	var list listResponse
@@ -202,6 +214,10 @@ func (c *Client) Publish(ctx context.Context, space, pagePath, storage string, v
 			continue
 		}
 		if leaf {
+			if strings.TrimSpace(existing.Body.Storage.Value) == strings.TrimSpace(storage) {
+				// Page content is identical, skip remote API update
+				return existing, false, nil
+			}
 			updated, err := c.UpdatePage(ctx, existing, storage, versionMessage)
 			if err != nil {
 				return nil, false, fmt.Errorf("update page %q: %w", title, err)
@@ -214,18 +230,29 @@ func (c *Client) Publish(ctx context.Context, space, pagePath, storage string, v
 }
 
 // UploadAttachment uploads a local file as a Confluence page attachment.
-func (c *Client) UploadAttachment(ctx context.Context, pageID, filePath string) error {
-	f, err := os.Open(filePath)
+// Returns (uploaded bool, err error). If the attachment on remote has identical file size, upload is skipped and uploaded is false.
+func (c *Client) UploadAttachment(ctx context.Context, pageID, filePath string) (bool, error) {
+	fi, err := os.Stat(filePath)
 	if err != nil {
-		return fmt.Errorf("open attachment %s: %w", filePath, err)
+		return false, fmt.Errorf("stat attachment %s: %w", filePath, err)
 	}
-	defer f.Close()
 
 	filename := filepath.Base(filePath)
-	existingID, err := c.findAttachmentID(ctx, pageID, filename)
+	existingID, existingSize, err := c.findAttachment(ctx, pageID, filename)
 	if err != nil {
-		return err
+		return false, err
 	}
+
+	// Skip upload if attachment exists and file size matches
+	if existingID != "" && existingSize == fi.Size() {
+		return false, nil
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return false, fmt.Errorf("open attachment %s: %w", filePath, err)
+	}
+	defer f.Close()
 
 	var reqPath string
 	if existingID != "" {
@@ -238,22 +265,22 @@ func (c *Client) UploadAttachment(ctx context.Context, pageID, filePath string) 
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("file", filename)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if _, err := io.Copy(part, f); err != nil {
-		return err
+		return false, err
 	}
 	if err := writer.Close(); err != nil {
-		return err
+		return false, err
 	}
 
 	if c.BaseURL == "" {
-		return fmt.Errorf("confluence base URL is not set")
+		return false, fmt.Errorf("confluence base URL is not set")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+reqPath, body)
 	if err != nil {
-		return err
+		return false, err
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -273,31 +300,33 @@ func (c *Client) UploadAttachment(ctx context.Context, pageID, filePath string) 
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("upload attachment HTTP %d: %s", resp.StatusCode, string(respBody))
+		return false, fmt.Errorf("upload attachment HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	return nil
+	return true, nil
 }
 
-func (c *Client) findAttachmentID(ctx context.Context, pageID, filename string) (string, error) {
+func (c *Client) findAttachment(ctx context.Context, pageID, filename string) (id string, size int64, err error) {
 	q := url.Values{}
 	q.Set("filename", filename)
+	q.Set("expand", "extensions.media")
 	reqPath := fmt.Sprintf("/content/%s/child/attachment?%s", url.PathEscape(pageID), q.Encode())
 
 	var list listResponse
 	if err := c.do(ctx, http.MethodGet, reqPath, nil, &list); err != nil {
-		return "", nil
+		return "", 0, nil
 	}
 	if len(list.Results) > 0 {
-		return list.Results[0].ID, nil
+		att := list.Results[0]
+		return att.ID, att.Extensions.Media.FileSize, nil
 	}
-	return "", nil
+	return "", 0, nil
 }
 
 // FetchPage retrieves a page by space and title/path (or page ID), expanding body.storage and ancestors.
