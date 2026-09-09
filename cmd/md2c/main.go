@@ -148,7 +148,25 @@ func run(args []string, rt runtime) int {
 	message := fs.String("message", "", "Alias for -reason")
 	installSkillFlag := fs.String("install-skill", "", "Install agent skill (agy, gemini, codex, cursor, all)")
 
-	if err := fs.Parse(args); err != nil {
+	// Pre-process args to separate flags starting with - or -- from positional arguments
+	var flagArgs []string
+	var posArgs []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "-") {
+			flagArgs = append(flagArgs, arg)
+			// Check if flag takes a value in next arg (e.g. --reason "text" or --config file)
+			if (arg == "--reason" || arg == "-reason" || arg == "--message" || arg == "-message" || arg == "--config" || arg == "-config" || arg == "--install-skill" || arg == "-install-skill") && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				flagArgs = append(flagArgs, args[i])
+			}
+		} else {
+			posArgs = append(posArgs, arg)
+		}
+	}
+	parsedArgs := append(flagArgs, posArgs...)
+
+	if err := fs.Parse(parsedArgs); err != nil {
 		return 2
 	}
 
@@ -278,12 +296,16 @@ func run(args []string, rt runtime) int {
 	for _, att := range attachments {
 		currentStep++
 		attBase := filepath.Base(att)
-		report.Progress(rt.Stderr, colorErr, currentStep, totalSteps, fmt.Sprintf("Lade Anhang hoch (%s)...", attBase))
 		attPath := filepath.Join(mdDir, att)
-		if err := client.UploadAttachment(ctx, page.ID, attPath); err != nil {
+		uploaded, err := client.UploadAttachment(ctx, page.ID, attPath)
+		if err != nil {
 			report.Failure(rt.Stderr, colorErr, fmt.Sprintf("Attachment-Upload fehlgeschlagen (%s)", att), err.Error())
-		} else {
+		} else if uploaded {
+			report.Progress(rt.Stderr, colorErr, currentStep, totalSteps, fmt.Sprintf("Lade Anhang hoch (%s)...", attBase))
 			uploadedAtts = append(uploadedAtts, attBase)
+		} else {
+			report.Progress(rt.Stderr, colorErr, currentStep, totalSteps, fmt.Sprintf("Anhang unverändert, übersprungen (%s)...", attBase))
+			uploadedAtts = append(uploadedAtts, attBase+" (unverändert)")
 		}
 	}
 	if totalSteps > 0 {
