@@ -8,6 +8,11 @@ if git -C "$root" describe --tags --match 'v0.*' --exact-match >/dev/null 2>&1; 
 	git -C "$root" describe --tags --match 'v0.*' --exact-match
 	exit 0
 fi
+last_tag=$(git -C "$root" tag -l 'v0.*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+if [ -n "$last_tag" ]; then
+	echo "$last_tag"
+	exit 0
+fi
 if [ -f "$root/VERSION" ]; then
 	printf 'v%s\n' "$(tr -d ' \t\n' <"$root/VERSION")"
 	exit 0
