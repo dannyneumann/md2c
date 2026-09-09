@@ -18,6 +18,8 @@ func NormalizeStorageHTML(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = reMacroID.ReplaceAllString(s, "")
 	s = reSchemaVersion.ReplaceAllString(s, "")
+	s = strings.ReplaceAll(s, " />", ">")
+	s = strings.ReplaceAll(s, "/>", ">")
 	s = strings.ReplaceAll(s, "&quot;", `"`)
 	s = strings.ReplaceAll(s, "&#34;", `"`)
 	s = strings.ReplaceAll(s, "&#39;", `'`)

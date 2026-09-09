@@ -370,7 +370,7 @@ func (c *Client) findAttachment(ctx context.Context, pageID, filename string) (i
 
 	var list listResponse
 	if err := c.do(ctx, http.MethodGet, reqPath, nil, &list); err != nil {
-		return "", 0, nil
+		return "", 0, err
 	}
 	if len(list.Results) > 0 {
 		att := list.Results[0]
