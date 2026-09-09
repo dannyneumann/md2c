@@ -456,6 +456,68 @@ func TestRunPublishUpdate(t *testing.T) {
 	}
 }
 
+func TestRunPublishWithReason(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "note.md")
+	if err := os.WriteFile(path, []byte("Hello\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedReason string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"results": []map[string]any{{
+					"id":      "99",
+					"type":    "page",
+					"title":   "Hello",
+					"space":   map[string]string{"key": "DEV"},
+					"version": map[string]int{"number": 1},
+				}},
+				"size": 1,
+			})
+		case http.MethodPut:
+			raw, _ := io.ReadAll(r.Body)
+			var payload map[string]any
+			_ = json.Unmarshal(raw, &payload)
+			if ver, ok := payload["version"].(map[string]any); ok {
+				capturedReason, _ = ver["message"].(string)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":      "99",
+				"type":    "page",
+				"title":   "Hello",
+				"space":   map[string]string{"key": "DEV"},
+				"version": map[string]int{"number": 2},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	home := t.TempDir()
+	writeConf(t, home, "MD2C_BASE_URL="+srv.URL+"\nMD2C_USER=me\nMD2C_TOKEN=token\n")
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	code := run([]string{"--reason=Fix formatting and typos", path, "DEV", "Hello"}, runtime{
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Getenv:     func(string) string { return "" },
+		Home:       home,
+		Cwd:        dir,
+	})
+	if code != 0 {
+		t.Fatalf("exit %d stderr %s", code, stderr)
+	}
+	if capturedReason != "Fix formatting and typos" {
+		t.Fatalf("expected version message 'Fix formatting and typos', got %q", capturedReason)
+	}
+}
+
 func TestRunPublishError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
