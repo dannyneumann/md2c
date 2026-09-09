@@ -242,12 +242,23 @@ func (c *Client) PublishWithOptions(ctx context.Context, space, pagePath, storag
 		}
 		if leaf {
 			remoteStorage := existing.Body.Storage.Value
-			if strings.TrimSpace(remoteStorage) == strings.TrimSpace(storage) {
-				// Page content is identical, skip remote API update
+			if NormalizeStorageHTML(remoteStorage) == NormalizeStorageHTML(storage) {
+				// Page content is identical (ignoring dynamic ac:macro-id/ac:schema-version metadata), skip remote API update
 				return &PublishResult{Page: existing, Created: false, Skipped: true, RemoteBody: remoteStorage}, nil
 			}
 
 			diff := ComputeDiff(remoteStorage, storage)
+			remoteDiffers := len(diff) > 0
+			for _, d := range diff {
+				if d.Type != ' ' {
+					remoteDiffers = true
+					break
+				}
+			}
+
+			if !remoteDiffers {
+				return &PublishResult{Page: existing, Created: false, Skipped: true, RemoteBody: remoteStorage}, nil
+			}
 
 			if opts.DiffOnly {
 				return &PublishResult{Page: existing, Created: false, Skipped: true, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, nil
