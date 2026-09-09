@@ -70,6 +70,30 @@ func Target(w io.Writer, color bool, file, space, pagePath string) {
 	fmt.Fprintln(w)
 }
 
+// Progress writes an active step or progressbar line for uploads/publishing.
+func Progress(w io.Writer, color bool, current, total int, label string) {
+	if total <= 0 {
+		fmt.Fprintf(w, "  %s %s...\n", paint(color, bold+cyan, "➜"), label)
+		return
+	}
+	width := 20
+	percent := float64(current) / float64(total)
+	filled := int(percent * float64(width))
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
+	pctText := fmt.Sprintf("%3.0f%%", percent*100)
+	stepText := fmt.Sprintf("[%d/%d]", current, total)
+	fmt.Fprintf(w, "  %s %s [%s] %s %s\n",
+		paint(color, bold+cyan, "➜"),
+		paint(color, bold+cyan, bar),
+		paint(color, yellow, pctText),
+		paint(color, dim, stepText),
+		label,
+	)
+}
+
 // Success writes a multi-line create or update summary for publish.
 func Success(w io.Writer, color bool, r Result) {
 	headline := "Seite aktualisiert"
@@ -128,6 +152,27 @@ func PullResult(w io.Writer, color bool, p PullData) {
 		status = "Aktualisiert"
 	}
 	kv(w, color, "Status", status)
+	fmt.Fprintln(w)
+}
+
+// LintResult writes a clean summary of lint issues found.
+func LintResult(w io.Writer, color bool, file string, issues []string, hasError bool) {
+	if len(issues) == 0 {
+		fmt.Fprintln(w, paint(color, bold+green, fmt.Sprintf("✓ Linting erfolgreich: %s ist valide", file)))
+		fmt.Fprintln(w)
+		return
+	}
+
+	headline := fmt.Sprintf("LINT SYNTAX / FEHLER (%s)", file)
+	style := bold + yellow
+	if hasError {
+		style = bold + red
+	}
+	fmt.Fprintln(w, paint(color, style, headline))
+	fmt.Fprintln(w)
+	for _, issue := range issues {
+		fmt.Fprintf(w, "  %s\n", issue)
+	}
 	fmt.Fprintln(w)
 }
 

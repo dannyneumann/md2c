@@ -15,6 +15,7 @@ import (
 	"md2confluence/internal/config"
 	"md2confluence/internal/confluence"
 	"md2confluence/internal/convert"
+	"md2confluence/internal/lint"
 	"md2confluence/internal/meta"
 	"md2confluence/internal/report"
 )
@@ -40,11 +41,15 @@ Aufruf:
   Fehlt space/path/title in der Datei, auf der Kommandozeile mitgeben:
     md2c page.md DOC Guides/Getting started
 
+Aufruf (Linting / Syntax-Prüfung):
+  md2c lint <datei>
+
 Aufruf (Download / Pull aus Confluence):
   md2c pull <space> <pfad>
   md2c pull <confluence-url>
 
   Beispiele:
+    md2c lint page.md
     md2c pull PSE "Leitplanken/Nutzung-Kalender"
     md2c pull https://confluence.example.com/spaces/PSE/pages/123/Nutzung-Kalender
 
@@ -68,6 +73,7 @@ Unterstützte Formatierungen:
 
 Flags:
   -dry-run    Nur konvertieren, nicht publizieren (braucht keine Config)
+  -no-lint    Automatischen Markdown-Linter vor dem Publizieren überspringen
   -version    Version, Quelle und Autor ausgeben
   -config     Conf-Datei (Standard: ~/.config/md2c/md2c.conf)
               z. B. --config=~/.config/md2c/md2c.conf
@@ -126,6 +132,7 @@ func run(args []string, rt runtime) int {
 	}
 
 	dryRun := fs.Bool("dry-run", false, "Convert only; do not publish")
+	noLint := fs.Bool("no-lint", false, "Skip automatic markdown linting")
 	showVersion := fs.Bool("version", false, "Print version and exit")
 	configPath := fs.String("config", "", "Path to md2c.conf")
 
@@ -141,6 +148,9 @@ func run(args []string, rt runtime) int {
 	}
 
 	rest := fs.Args()
+	if len(rest) >= 1 && rest[0] == "lint" {
+		return handleLint(rest[1:], colorOut, colorErr, rt)
+	}
 	if len(rest) >= 1 && (rest[0] == "pull" || rest[0] == "download") {
 		return handlePull(rest[1:], *configPath, colorOut, colorErr, rt)
 	}
@@ -149,7 +159,7 @@ func run(args []string, rt runtime) int {
 		fmt.Fprint(rt.Stderr, usageText)
 		fmt.Fprintln(rt.Stderr)
 		report.Failure(rt.Stderr, colorErr, "Aufruf ungültig",
-			fmt.Sprintf("erwartet <datei>, <datei> <space> <pfad> oder pull <space> <pfad>, bekommen %d Argument(e)", len(rest)))
+			fmt.Sprintf("erwartet <datei>, <datei> <space> <pfad>, lint <datei> oder pull <space> <pfad>, bekommen %d Argument(e)", len(rest)))
 		return 2
 	}
 
@@ -166,6 +176,23 @@ func run(args []string, rt runtime) int {
 	if err != nil {
 		report.Failure(rt.Stderr, colorErr, "Datei konnte nicht gelesen werden", fmt.Sprintf("%s: %v", filePath, err))
 		return 1
+	}
+
+	if !*noLint {
+		issues := lint.Lint(raw, lint.LintOptions{BaseDir: filepath.Dir(filePath)})
+		hasError := false
+		var issueStrs []string
+		for _, iss := range issues {
+			issueStrs = append(issueStrs, iss.String())
+			if iss.Level == "error" {
+				hasError = true
+			}
+		}
+		if hasError {
+			report.LintResult(rt.Stderr, colorErr, filePath, issueStrs, true)
+			report.Failure(rt.Stderr, colorErr, "Markdown-Linting fehlgeschlagen", "Bitte Syntaxfehler vor dem Publizieren beheben (oder mit --no-lint überspringen)")
+			return 1
+		}
 	}
 
 	fileMeta, markdown := meta.Extract(string(raw))
@@ -212,6 +239,10 @@ func run(args []string, rt runtime) int {
 	ctx, cancel := context.WithTimeout(context.Background(), rt.Timeout)
 	defer cancel()
 
+	totalSteps := 1 + len(attachments)
+	currentStep := 1
+	report.Progress(rt.Stderr, colorErr, currentStep, totalSteps, fmt.Sprintf("Publiziere Seite nach Confluence (%s / %s)...", space, pagePath))
+
 	page, created, err := client.Publish(ctx, space, pagePath, body)
 	if err != nil {
 		report.Failure(rt.Stderr, colorErr, "Publizieren fehlgeschlagen", err.Error())
@@ -221,12 +252,18 @@ func run(args []string, rt runtime) int {
 	var uploadedAtts []string
 	mdDir := filepath.Dir(filePath)
 	for _, att := range attachments {
+		currentStep++
+		attBase := filepath.Base(att)
+		report.Progress(rt.Stderr, colorErr, currentStep, totalSteps, fmt.Sprintf("Lade Anhang hoch (%s)...", attBase))
 		attPath := filepath.Join(mdDir, att)
 		if err := client.UploadAttachment(ctx, page.ID, attPath); err != nil {
 			report.Failure(rt.Stderr, colorErr, fmt.Sprintf("Attachment-Upload fehlgeschlagen (%s)", att), err.Error())
 		} else {
-			uploadedAtts = append(uploadedAtts, filepath.Base(att))
+			uploadedAtts = append(uploadedAtts, attBase)
 		}
+	}
+	if totalSteps > 0 {
+		fmt.Fprintln(rt.Stderr)
 	}
 
 	report.Success(rt.Stdout, colorOut, report.Result{
@@ -375,5 +412,34 @@ func handlePull(args []string, configPath string, colorOut, colorErr bool, rt ru
 		FileExisted: fileExisted,
 		Attachments: downloadedAtts,
 	})
+	return 0
+}
+
+func handleLint(args []string, colorOut, colorErr bool, rt runtime) int {
+	if len(args) == 0 {
+		report.Failure(rt.Stderr, colorErr, "Lint-Aufruf unvollständig", "bitte Datei angeben: md2c lint <datei>")
+		return 2
+	}
+	filePath := args[0]
+	raw, err := rt.ReadFile(filePath)
+	if err != nil {
+		report.Failure(rt.Stderr, colorErr, "Datei konnte nicht gelesen werden", fmt.Sprintf("%s: %v", filePath, err))
+		return 1
+	}
+
+	issues := lint.Lint(raw, lint.LintOptions{BaseDir: filepath.Dir(filePath)})
+	hasError := false
+	var issueStrs []string
+	for _, iss := range issues {
+		issueStrs = append(issueStrs, iss.String())
+		if iss.Level == "error" {
+			hasError = true
+		}
+	}
+
+	report.LintResult(rt.Stdout, colorOut, filePath, issueStrs, hasError)
+	if hasError {
+		return 1
+	}
 	return 0
 }
