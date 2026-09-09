@@ -22,11 +22,22 @@ help:
 	@echo "Zugang: ~/.config/md2c/md2c.conf  (siehe md2c.conf.example)"
 
 dev: build
-	@if [ -w "$$(brew --prefix)/bin/md2c" ] || ( [ ! -e "$$(brew --prefix)/bin/md2c" ] && [ -w "$$(brew --prefix)/bin" ] ); then \
-		cp bin/md2c "$$(brew --prefix)/bin/md2c"; \
-		echo "✓ Local dev binary installed to $$(brew --prefix)/bin/md2c"; \
-	elif [ -d "$$HOME/go/bin" ]; then \
-		cp bin/md2c "$$HOME/go/bin/md2c"; \
+	@target="$$(which md2c 2>/dev/null || true)"; \
+	if [ -n "$$target" ] && [ -L "$$target" ]; then \
+		link_target="$$(readlink "$$target" || echo "$$target")"; \
+		case "$$link_target" in \
+			/*) real_target="$$link_target" ;; \
+			*) real_target="$$(brew --prefix)/bin/$$link_target" ;; \
+		esac; \
+		if [ -e "$$real_target" ]; then \
+			chmod +w "$$real_target" 2>/dev/null || true; \
+			cp -f bin/md2c "$$real_target"; \
+			echo "✓ Local dev binary updated in Homebrew Cellar ($$real_target)"; \
+			exit 0; \
+		fi; \
+	fi; \
+	if [ -d "$$HOME/go/bin" ]; then \
+		cp -f bin/md2c "$$HOME/go/bin/md2c"; \
 		echo "✓ Local dev binary installed to $$HOME/go/bin/md2c"; \
 	else \
 		$(GO) install -ldflags "$(LDFLAGS)" ./cmd/md2c; \
