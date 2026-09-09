@@ -52,13 +52,13 @@ To upgrade later:
 brew upgrade dannyneumann/md2c/md2c
 ```
 
-### Aus dem Quellcode
+### Aus dem Quellcode (via Makefile)
 
 ```bash
-make install
+make install # oder make brew
 ```
 
-legt `md2c` nach `~/.local/bin/md2c`. `~/.local/bin` sollte in `PATH` stehen.
+Führt automatisch `brew install` bzw. `brew upgrade dannyneumann/md2c/md2c` durch.
 
 ## Konfiguration
 
