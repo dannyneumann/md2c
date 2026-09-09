@@ -367,7 +367,9 @@ func run(args []string, rt runtime) int {
 		currentStep++
 		attBase := filepath.Base(att)
 		attPath := filepath.Join(mdDir, att)
-		uploaded, err := client.UploadAttachment(ctx, page.ID, attPath)
+		attCtx, attCancel := context.WithTimeout(context.Background(), rt.Timeout)
+		uploaded, err := client.UploadAttachment(attCtx, page.ID, attPath)
+		attCancel()
 		if err != nil {
 			report.Failure(rt.Stderr, colorErr, fmt.Sprintf("Attachment-Upload fehlgeschlagen (%s)", att), err.Error())
 		} else if uploaded {
