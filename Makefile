@@ -4,20 +4,37 @@ LDFLAGS := -s -w -X 'main.version=$(VERSION)'
 
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 
-.PHONY: help test lint build install dist homebrew hooks clean tidy
+.PHONY: help test lint build install dev dev-install install-local dist homebrew hooks clean tidy
 
 help:
-	@echo "make test     Tests (race + coverage)"
-	@echo "make lint     golangci-lint (Docker, falls verfügbar)"
-	@echo "make build    Baut bin/md2c $(VERSION)"
-	@echo "make dist     Cross-compile nach dist/"
-	@echo "make homebrew Formula/md2c.rb aus dist/SHA256SUMS"
-	@echo "make install  Installiert oder aktualisiert md2c via Homebrew"
-	@echo "make brew     Alias für make install"
-	@echo "make hooks    Installiert pre-push (Unit-Tests vor git push)"
-	@echo "make tidy     go mod tidy"
+	@echo "make dev           Baut und installiert md2c sofort lokal nach GOPATH/bin oder /usr/local/bin"
+	@echo "make install-local Alias für make dev"
+	@echo "make test          Tests (race + coverage)"
+	@echo "make lint          golangci-lint (Docker, falls verfügbar)"
+	@echo "make build         Baut bin/md2c $(VERSION)"
+	@echo "make dist          Cross-compile nach dist/"
+	@echo "make homebrew      Formula/md2c.rb aus dist/SHA256SUMS"
+	@echo "make install       Installiert oder aktualisiert md2c via Homebrew"
+	@echo "make brew          Alias für make install"
+	@echo "make hooks         Installiert pre-push (Unit-Tests vor git push)"
+	@echo "make tidy          go mod tidy"
 	@echo
 	@echo "Zugang: ~/.config/md2c/md2c.conf  (siehe md2c.conf.example)"
+
+dev: build
+	@if [ -w "$$(brew --prefix)/bin/md2c" ] || ( [ ! -e "$$(brew --prefix)/bin/md2c" ] && [ -w "$$(brew --prefix)/bin" ] ); then \
+		cp bin/md2c "$$(brew --prefix)/bin/md2c"; \
+		echo "✓ Local dev binary installed to $$(brew --prefix)/bin/md2c"; \
+	elif [ -d "$$HOME/go/bin" ]; then \
+		cp bin/md2c "$$HOME/go/bin/md2c"; \
+		echo "✓ Local dev binary installed to $$HOME/go/bin/md2c"; \
+	else \
+		$(GO) install -ldflags "$(LDFLAGS)" ./cmd/md2c; \
+		echo "✓ Local dev binary installed via go install"; \
+	fi
+
+dev-install: dev
+install-local: dev
 
 test:
 	$(GO) test -v -race -cover ./...
