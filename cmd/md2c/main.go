@@ -74,6 +74,8 @@ Unterstützte Formatierungen:
 Flags:
   -dry-run    Nur konvertieren, nicht publizieren (braucht keine Config)
   -no-lint    Automatischen Markdown-Linter vor dem Publizieren überspringen
+  -reason     Grund/Kommentar für die Versionshistorie in Confluence angeben
+  -message    Alias für -reason
   -version    Version, Quelle und Autor ausgeben
   -config     Conf-Datei (Standard: ~/.config/md2c/md2c.conf)
               z. B. --config=~/.config/md2c/md2c.conf
@@ -135,9 +137,16 @@ func run(args []string, rt runtime) int {
 	noLint := fs.Bool("no-lint", false, "Skip automatic markdown linting")
 	showVersion := fs.Bool("version", false, "Print version and exit")
 	configPath := fs.String("config", "", "Path to md2c.conf")
+	reason := fs.String("reason", "", "Version comment/reason in Confluence history")
+	message := fs.String("message", "", "Alias for -reason")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+
+	changeReason := *reason
+	if changeReason == "" {
+		changeReason = *message
 	}
 
 	colorOut := report.Enabled(rt.Stdout, rt.Getenv)
@@ -243,7 +252,7 @@ func run(args []string, rt runtime) int {
 	currentStep := 1
 	report.Progress(rt.Stderr, colorErr, currentStep, totalSteps, fmt.Sprintf("Publiziere Seite nach Confluence (%s / %s)...", space, pagePath))
 
-	page, created, err := client.Publish(ctx, space, pagePath, body)
+	page, created, err := client.Publish(ctx, space, pagePath, body, changeReason)
 	if err != nil {
 		report.Failure(rt.Stderr, colorErr, "Publizieren fehlgeschlagen", err.Error())
 		return 1

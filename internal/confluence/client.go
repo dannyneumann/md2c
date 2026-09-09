@@ -139,8 +139,12 @@ func (c *Client) CreatePage(ctx context.Context, space, title, parentID, storage
 	return &page, nil
 }
 
-// UpdatePage replaces the storage body of an existing page.
-func (c *Client) UpdatePage(ctx context.Context, page *Page, storage string) (*Page, error) {
+// UpdatePage replaces the storage body of an existing page with an optional version message.
+func (c *Client) UpdatePage(ctx context.Context, page *Page, storage string, versionMessage string) (*Page, error) {
+	msg := versionMessage
+	if strings.TrimSpace(msg) == "" {
+		msg = "updated by md2c"
+	}
 	body := map[string]any{
 		"id":    page.ID,
 		"type":  "page",
@@ -154,7 +158,7 @@ func (c *Client) UpdatePage(ctx context.Context, page *Page, storage string) (*P
 		},
 		"version": map[string]any{
 			"number":  page.Version.Number + 1,
-			"message": "updated by md2c",
+			"message": msg,
 		},
 	}
 
@@ -169,7 +173,7 @@ func (c *Client) UpdatePage(ctx context.Context, page *Page, storage string) (*P
 // segments become parent pages when they do not exist. The last segment is
 // the page title whose body is replaced with storage.
 // created is true when the leaf page did not exist yet.
-func (c *Client) Publish(ctx context.Context, space, pagePath, storage string) (page *Page, created bool, err error) {
+func (c *Client) Publish(ctx context.Context, space, pagePath, storage string, versionMessage string) (page *Page, created bool, err error) {
 	segments := SplitPath(pagePath)
 	if len(segments) == 0 {
 		return nil, false, fmt.Errorf("path is empty")
@@ -198,7 +202,7 @@ func (c *Client) Publish(ctx context.Context, space, pagePath, storage string) (
 			continue
 		}
 		if leaf {
-			updated, err := c.UpdatePage(ctx, existing, storage)
+			updated, err := c.UpdatePage(ctx, existing, storage, versionMessage)
 			if err != nil {
 				return nil, false, fmt.Errorf("update page %q: %w", title, err)
 			}
