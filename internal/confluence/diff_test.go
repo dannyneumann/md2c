@@ -70,8 +70,8 @@ func TestPromptConflictChoice(t *testing.T) {
 }
 
 func TestNormalizeStorageHTML(t *testing.T) {
-	remote := `<ac:structured-macro ac:name="info" ac:schema-version="1" ac:macro-id="810ad198-980c-4713-b8a2-7f54b4a83558"><p>Maske &quot;Neuer Change&quot;</p></ac:structured-macro>`
-	local := `<ac:structured-macro ac:name="info"><p>Maske "Neuer Change"</p></ac:structured-macro>`
+	remote := `<p>Nach dem Login in <strong>oneITSM</strong> wird im Menü der Punkt <strong>&quot;Change Management&quot;</strong> ausgewählt.</p>`
+	local := `<p>Nach dem Login in <strong>oneITSM</strong> wird im Menü der Punkt <strong>"Change Management"</strong> ausgewählt.</p>`
 
 	normRemote := NormalizeStorageHTML(remote)
 	normLocal := NormalizeStorageHTML(local)
