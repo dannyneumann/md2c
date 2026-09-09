@@ -4,8 +4,26 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 )
+
+var (
+	reMacroID       = regexp.MustCompile(`\s+ac:macro-id="[^"]*"`)
+	reSchemaVersion = regexp.MustCompile(`\s+ac:schema-version="[^"]*"`)
+)
+
+// NormalizeStorageHTML strips auto-generated Confluence attributes and unescapes entities for comparison.
+func NormalizeStorageHTML(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = reMacroID.ReplaceAllString(s, "")
+	s = reSchemaVersion.ReplaceAllString(s, "")
+	s = strings.ReplaceAll(s, "&quot;", `"`)
+	s = strings.ReplaceAll(s, "&amp;", "&")
+	s = strings.ReplaceAll(s, "&lt;", "<")
+	s = strings.ReplaceAll(s, "&gt;", ">")
+	return strings.TrimSpace(s)
+}
 
 // ConflictAction represents the user's choice when remote Confluence content differs.
 type ConflictAction int
@@ -24,8 +42,11 @@ type DiffLine struct {
 
 // ComputeDiff computes a simple line-by-line diff between remote string and local string.
 func ComputeDiff(remoteText, localText string) []DiffLine {
-	remoteLines := strings.Split(strings.ReplaceAll(remoteText, "\r\n", "\n"), "\n")
-	localLines := strings.Split(strings.ReplaceAll(localText, "\r\n", "\n"), "\n")
+	normRemote := NormalizeStorageHTML(remoteText)
+	normLocal := NormalizeStorageHTML(localText)
+
+	remoteLines := strings.Split(normRemote, "\n")
+	localLines := strings.Split(normLocal, "\n")
 
 	var diff []DiffLine
 
