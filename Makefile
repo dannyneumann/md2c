@@ -12,7 +12,8 @@ help:
 	@echo "make build    Baut bin/md2c $(VERSION)"
 	@echo "make dist     Cross-compile nach dist/"
 	@echo "make homebrew Formula/md2c.rb aus dist/SHA256SUMS"
-	@echo "make install  Installiert nach $$HOME/.local/bin/md2c"
+	@echo "make install  Installiert oder aktualisiert md2c via Homebrew"
+	@echo "make brew     Alias für make install"
 	@echo "make hooks    Installiert pre-push (Unit-Tests vor git push)"
 	@echo "make tidy     go mod tidy"
 	@echo
@@ -46,10 +47,17 @@ dist:
 homebrew:
 	$(GO) run ./cmd/update-homebrew-formula -version $(VERSION) -sums dist/SHA256SUMS -out Formula/md2c.rb
 
-install: build
-	mkdir -p "$(HOME)/.local/bin"
-	install -m 0755 bin/md2c "$(HOME)/.local/bin/md2c"
-	@echo "installed $(HOME)/.local/bin/md2c"
+install:
+	@if brew list dannyneumann/md2c/md2c >/dev/null 2>&1; then \
+		echo "Upgrading md2c via Homebrew..."; \
+		brew upgrade dannyneumann/md2c/md2c; \
+	else \
+		echo "Installing md2c via Homebrew..."; \
+		brew tap dannyneumann/md2c https://github.com/dannyneumann/md2c; \
+		brew install dannyneumann/md2c/md2c; \
+	fi
+
+brew: install
 
 hooks:
 	mkdir -p .git/hooks
