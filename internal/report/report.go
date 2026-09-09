@@ -25,6 +25,7 @@ type Result struct {
 	Created     bool
 	Title       string
 	Version     int
+	Reason      string
 	URL         string
 	ID          string
 	Attachments []string
@@ -107,6 +108,9 @@ func Success(w io.Writer, color bool, r Result) {
 	kv(w, color, "Titel", r.Title)
 	if r.Version > 0 {
 		kv(w, color, "Version", strconv.Itoa(r.Version))
+	}
+	if r.Reason != "" {
+		kv(w, color, "Grund", r.Reason)
 	}
 	if r.URL != "" {
 		kv(w, color, "URL", paint(color, blue, r.URL))
