@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"md2confluence/internal/meta"
 )
 
 func TestRunVersion(t *testing.T) {
@@ -933,6 +935,22 @@ func TestRunDiffCommand(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "--- Confluence Remote") || !strings.Contains(stdout.String(), "+++ Lokale Datei") {
 		t.Fatalf("stdout missing diff output: %s", stdout)
+	}
+}
+
+func TestResolveTargetWithConfluenceURL(t *testing.T) {
+	t.Parallel()
+	rawURL := "https://confluence.bitmarck.de/spaces/TIKB/pages/585107318/Erstellen+eines+internen+ITSM+Changerequests"
+	m, _ := meta.Extract("<!-- space:TIKB,path:Service - Übergreifend Telematik,title:Erstellen eines internen ITSM Changerequests -->")
+	space, pagePath, err := resolveTarget(rawURL, "", m)
+	if err != nil {
+		t.Fatalf("resolveTarget failed: %v", err)
+	}
+	if space != "TIKB" {
+		t.Errorf("expected space TIKB, got %q", space)
+	}
+	if pagePath != "Erstellen eines internen ITSM Changerequests" {
+		t.Errorf("expected pagePath 'Erstellen eines internen ITSM Changerequests', got %q", pagePath)
 	}
 }
 

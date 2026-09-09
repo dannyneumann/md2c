@@ -396,12 +396,47 @@ func run(args []string, rt runtime) int {
 	return 0
 }
 
+func parseConfluenceURL(rawURL string) (space, pagePath string) {
+	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+		return "", ""
+	}
+	parts := strings.Split(rawURL, "/")
+	for i, p := range parts {
+		if strings.EqualFold(p, "spaces") && i+1 < len(parts) {
+			space = parts[i+1]
+		}
+		if strings.EqualFold(p, "pages") && i+1 < len(parts) {
+			pagePath = parts[i+1]
+			if i+2 < len(parts) && parts[i+2] != "" {
+				tPart := strings.ReplaceAll(parts[i+2], "+", " ")
+				tPart, _ = url.QueryUnescape(tPart)
+				if tPart != "" {
+					pagePath = tPart
+				}
+			}
+		}
+	}
+	return space, pagePath
+}
+
 func resolveTarget(cliSpace, cliPath string, m meta.Meta) (space, pagePath string, err error) {
 	space = cliSpace
+	pagePath = cliPath
+
+	// Check if cliSpace is actually a full Confluence URL
+	if strings.HasPrefix(cliSpace, "http://") || strings.HasPrefix(cliSpace, "https://") {
+		uSpace, uPath := parseConfluenceURL(cliSpace)
+		if uSpace != "" {
+			space = uSpace
+		}
+		if uPath != "" && pagePath == "" {
+			pagePath = uPath
+		}
+	}
+
 	if space == "" {
 		space = m.Space
 	}
-	pagePath = cliPath
 	if pagePath == "" {
 		pagePath = m.Destination()
 	}
@@ -429,25 +464,8 @@ func handlePull(args []string, configPath string, colorOut, colorErr bool, rt ru
 	if len(args) == 1 {
 		// URL or space/path
 		rawURL = args[0]
-		if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
-			// Parse space and title or page ID from URL e.g. .../spaces/PSE/pages/572179008/DRAFT+-+Nutzung+Confluence-Kalender
-			parts := strings.Split(rawURL, "/")
-			for i, p := range parts {
-				if strings.EqualFold(p, "spaces") && i+1 < len(parts) {
-					space = parts[i+1]
-				}
-				if strings.EqualFold(p, "pages") && i+1 < len(parts) {
-					pagePath = parts[i+1]
-					if i+2 < len(parts) && parts[i+2] != "" {
-						tPart := strings.ReplaceAll(parts[i+2], "+", " ")
-						tPart, _ = url.QueryUnescape(tPart)
-						if tPart != "" {
-							pagePath = tPart
-						}
-					}
-				}
-			}
-		} else {
+		space, pagePath = parseConfluenceURL(rawURL)
+		if space == "" && pagePath == "" {
 			report.Failure(rt.Stderr, colorErr, "Pull-Aufruf ungültig", "bitte Space und Pfad angeben: md2c pull <space> <pfad>")
 			return 2
 		}
