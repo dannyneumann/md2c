@@ -48,12 +48,16 @@ homebrew:
 	$(GO) run ./cmd/update-homebrew-formula -version $(VERSION) -sums dist/SHA256SUMS -out Formula/md2c.rb
 
 install:
+	@brew trust dannyneumann/md2c >/dev/null 2>&1 || true
+	@if ! brew tap | grep -q "^dannyneumann/md2c$$"; then \
+		echo "Tapping dannyneumann/md2c..."; \
+		brew tap dannyneumann/md2c https://github.com/dannyneumann/md2c.git || true; \
+	fi
 	@if brew list dannyneumann/md2c/md2c >/dev/null 2>&1; then \
 		echo "Upgrading md2c via Homebrew..."; \
-		brew upgrade dannyneumann/md2c/md2c; \
+		brew upgrade dannyneumann/md2c/md2c || true; \
 	else \
 		echo "Installing md2c via Homebrew..."; \
-		brew tap dannyneumann/md2c https://github.com/dannyneumann/md2c; \
 		brew install dannyneumann/md2c/md2c; \
 	fi
 
