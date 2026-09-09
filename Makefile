@@ -49,6 +49,7 @@ homebrew:
 
 install:
 	@brew trust dannyneumann/md2c >/dev/null 2>&1 || true
+	@brew trust --formula dannyneumann/md2c/md2c >/dev/null 2>&1 || true
 	@if ! brew tap | grep -q "^dannyneumann/md2c$$"; then \
 		echo "Tapping dannyneumann/md2c..."; \
 		brew tap dannyneumann/md2c https://github.com/dannyneumann/md2c.git || true; \
