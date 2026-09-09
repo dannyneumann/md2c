@@ -138,7 +138,7 @@ func TestPublishCreatesHierarchyThenUpdates(t *testing.T) {
 	c := testClient(srv)
 	ctx := context.Background()
 
-	created, isNew, err := c.Publish(ctx, "DEV", "Engineering/Onboarding", "<p>hello</p>")
+	created, isNew, err := c.Publish(ctx, "DEV", "Engineering/Onboarding", "<p>hello</p>", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestPublishCreatesHierarchyThenUpdates(t *testing.T) {
 		t.Fatalf("leaf body %q", leaf.body)
 	}
 
-	updated, isNew, err := c.Publish(ctx, "DEV", "Engineering/Onboarding", "<p>updated</p>")
+	updated, isNew, err := c.Publish(ctx, "DEV", "Engineering/Onboarding", "<p>updated</p>", "custom reason")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestPageNumericID(t *testing.T) {
 func TestPublishEmptyPath(t *testing.T) {
 	t.Parallel()
 	c := New("https://example.com", "u", "t")
-	_, _, err := c.Publish(context.Background(), "DEV", "  /  ", "<p></p>")
+	_, _, err := c.Publish(context.Background(), "DEV", "  /  ", "<p></p>", "")
 	if err == nil {
 		t.Fatal("expected error")
 	}
