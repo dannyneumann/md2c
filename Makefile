@@ -1,13 +1,15 @@
 GO ?= go
 VERSION ?= $(shell sh scripts/version.sh)
+DEV_VERSION ?= $(VERSION)-dev
 LDFLAGS := -s -w -X 'main.version=$(VERSION)'
+DEV_LDFLAGS := -s -w -X 'main.version=$(DEV_VERSION)'
 
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64
 
 .PHONY: help test lint build install dev dev-install install-local dist homebrew hooks clean tidy
 
 help:
-	@echo "make dev           Baut und installiert md2c sofort lokal nach GOPATH/bin oder /usr/local/bin"
+	@echo "make dev           Baut und installiert md2c sofort lokal als $(DEV_VERSION)"
 	@echo "make install-local Alias für make dev"
 	@echo "make test          Tests (race + coverage)"
 	@echo "make lint          golangci-lint (Docker, falls verfügbar)"
@@ -21,7 +23,9 @@ help:
 	@echo
 	@echo "Zugang: ~/.config/md2c/md2c.conf  (siehe md2c.conf.example)"
 
-dev: build
+dev:
+	mkdir -p bin
+	$(GO) build -ldflags "$(DEV_LDFLAGS)" -o bin/md2c ./cmd/md2c
 	@target="$$(which md2c 2>/dev/null || true)"; \
 	if [ -n "$$target" ] && [ -L "$$target" ]; then \
 		link_target="$$(readlink "$$target" || echo "$$target")"; \
