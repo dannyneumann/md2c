@@ -888,3 +888,51 @@ func TestRunPublishFailOnRemoteChange(t *testing.T) {
 	}
 }
 
+func TestRunDiffCommand(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/content") {
+			resp := map[string]any{
+				"results": []map[string]any{
+					{
+						"id":    "123",
+						"title": "Page",
+						"space": map[string]string{"key": "DEV"},
+						"body": map[string]any{
+							"storage": map[string]string{"value": "<h1>Old Remote Header</h1>"},
+						},
+					},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	home := t.TempDir()
+	writeConf(t, home, "MD2C_BASE_URL="+srv.URL+"\nMD2C_USER=u\nMD2C_TOKEN=t\n")
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "doc.md")
+	_ = os.WriteFile(path, []byte("# New Local Header\n"), 0o600)
+
+	stdout, stderr := &strings.Builder{}, &strings.Builder{}
+	code := run([]string{"diff", path, "DEV", "Page"}, runtime{
+		Home:       home,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		HTTPClient: srv.Client(),
+		Getenv:     func(string) string { return "" },
+		Cwd:        dir,
+	})
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for md2c diff, got %d. stderr: %s", code, stderr)
+	}
+	if !strings.Contains(stdout.String(), "--- Confluence Remote") || !strings.Contains(stdout.String(), "+++ Lokale Datei") {
+		t.Fatalf("stdout missing diff output: %s", stdout)
+	}
+}
+
