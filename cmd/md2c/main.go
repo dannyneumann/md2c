@@ -78,14 +78,17 @@ Unterstützte Formatierungen:
   - Lokale Bilder (![alt](./bild.png)) -> Automatischer Attachment-Upload & Download
 
 Flags:
-  -dry-run       Nur konvertieren, nicht publizieren (braucht keine Config)
-  -no-lint       Automatischen Markdown-Linter vor dem Publizieren überspringen
-  -reason        Grund/Kommentar für die Versionshistorie in Confluence angeben
-  -message       Alias für -reason
-  -install-skill Agent Skill installieren (Ziele: agy, gemini, codex, cursor, all)
-  -version       Version, Quelle und Autor ausgeben
-  -config        Conf-Datei (Standard: ~/.config/md2c/md2c.conf)
-                 z. B. --config=~/.config/md2c/md2c.conf
+  -dry-run                Nur konvertieren, nicht publizieren (braucht keine Config)
+  -no-lint                Automatischen Markdown-Linter vor dem Publizieren überspringen
+  -reason                 Grund/Kommentar für die Versionshistorie in Confluence angeben
+  -message                Alias für -reason
+  -force                  Confluence-Seite ohne interaktive Abfrage überschreiben
+  -diff-only              Nur Diff gegen remote Confluence-Seite anzeigen und beenden
+  -fail-on-remote-change  Abbrechen mit Fehler-Code, falls Confluence remote abweicht
+  -install-skill          Agent Skill installieren (Ziele: agy, gemini, codex, cursor, all)
+  -version                Version, Quelle und Autor ausgeben
+  -config                 Conf-Datei (Standard: ~/.config/md2c/md2c.conf)
+                          z. B. --config=~/.config/md2c/md2c.conf
 
 Confluence-Zugang nur aus der Conf-Datei (MD2C_BASE_URL, MD2C_USER, MD2C_TOKEN).
 Output im Terminal: farbig (angelegt = grün, aktualisiert = cyan, Fehler = rot).
@@ -147,6 +150,9 @@ func run(args []string, rt runtime) int {
 	reason := fs.String("reason", "", "Version comment/reason in Confluence history")
 	message := fs.String("message", "", "Alias for -reason")
 	installSkillFlag := fs.String("install-skill", "", "Install agent skill (agy, gemini, codex, cursor, all)")
+	forceFlag := fs.Bool("force", false, "Overwrite remote content without interactive diff check")
+	diffOnlyFlag := fs.Bool("diff-only", false, "Show diff against remote page and exit without publishing")
+	failOnRemoteChangeFlag := fs.Bool("fail-on-remote-change", false, "Fail with exit code if remote page differs from local file")
 
 	// Pre-process args to separate flags starting with - or -- from positional arguments
 	var flagArgs []string
@@ -285,11 +291,67 @@ func run(args []string, rt runtime) int {
 	currentStep := 1
 	report.Progress(rt.Stderr, colorErr, currentStep, totalSteps, fmt.Sprintf("Publiziere Seite nach Confluence (%s / %s)...", space, pagePath))
 
-	page, created, err := client.Publish(ctx, space, pagePath, body, changeReason)
+	pubOpts := confluence.PublishOptions{
+		Force:              *forceFlag,
+		DiffOnly:           *diffOnlyFlag,
+		FailOnRemoteChange: *failOnRemoteChangeFlag,
+		Stdin:              os.Stdin,
+		Stdout:             rt.Stdout,
+	}
+
+	pubRes, err := client.PublishWithOptions(ctx, space, pagePath, body, changeReason, pubOpts)
 	if err != nil {
+		if pubRes != nil && pubRes.RemoteDiffers {
+			confluence.PrintDiff(rt.Stderr, colorErr, pubRes.Diff)
+		}
 		report.Failure(rt.Stderr, colorErr, "Publizieren fehlgeschlagen", err.Error())
 		return 1
 	}
+
+	if *diffOnlyFlag {
+		if pubRes.RemoteDiffers {
+			confluence.PrintDiff(rt.Stdout, colorOut, pubRes.Diff)
+		} else {
+			fmt.Fprintln(rt.Stdout, "Keine Abweichungen zwischen Confluence und lokaler Datei.")
+		}
+		return 0
+	}
+
+	// Interactive conflict handling if remote differs and not force-overwritten
+	if pubRes.RemoteDiffers && !*forceFlag && report.Enabled(rt.Stderr, rt.Getenv) {
+		confluence.PrintDiff(rt.Stderr, colorErr, pubRes.Diff)
+		action := confluence.PromptConflictChoice(os.Stdin, rt.Stderr)
+		switch action {
+		case confluence.ActionAbort:
+			report.Failure(rt.Stderr, colorErr, "Abgebrochen", "Veröffentlichung wegen Remote-Abweichung abgebrochen.")
+			return 1
+		case confluence.ActionMerge:
+			// Convert remote XHTML back to Markdown
+			remoteMD, _, err := convert.ToMarkdown(pubRes.RemoteBody)
+			if err != nil {
+				report.Failure(rt.Stderr, colorErr, "Merge fehlgeschlagen", fmt.Sprintf("Remote Content konnte nicht konvertiert werden: %v", err))
+				return 1
+			}
+			// Write merged Markdown with local changes (append or notice) and update local file
+			fmt.Fprintln(rt.Stderr, "Führe Merge von Confluence Remote in lokale Datei durch...")
+			var mergeBuf strings.Builder
+			if fileMeta.Space != "" || fileMeta.Path != "" || fileMeta.Title != "" {
+				mergeBuf.WriteString(fmt.Sprintf("<!-- space:%s,path:%s,title:%s -->\n", fileMeta.Space, fileMeta.Path, fileMeta.Title))
+			}
+			mergeBuf.WriteString(remoteMD)
+			if err := os.WriteFile(filePath, []byte(mergeBuf.String()), 0644); err != nil {
+				report.Failure(rt.Stderr, colorErr, "Merge-Datei konnte nicht geschrieben werden", err.Error())
+				return 1
+			}
+			fmt.Fprintf(rt.Stderr, "✓ Lokale Datei %s mit Confluence-Stand zusammengeführt.\n", filePath)
+			return 0
+		case confluence.ActionOverwrite:
+			// Proceed with overwrite
+		}
+	}
+
+	page := pubRes.Page
+	created := pubRes.Created
 
 	var uploadedAtts []string
 	mdDir := filepath.Dir(filePath)
