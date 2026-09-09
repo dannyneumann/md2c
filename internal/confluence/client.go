@@ -181,14 +181,41 @@ func (c *Client) UpdatePage(ctx context.Context, page *Page, storage string, ver
 	return &updated, nil
 }
 
+// PublishOptions controls remote conflict detection and publishing behavior.
+type PublishOptions struct {
+	Force               bool // Overwrite remote content without asking
+	DiffOnly            bool // Only show diff if remote content differs, do not update
+	FailOnRemoteChange  bool // Error if remote content differs
+	Stdin               io.Reader
+	Stdout              io.Writer
+}
+
+// PublishResult holds the outcome of a publish operation.
+type PublishResult struct {
+	Page         *Page
+	Created      bool
+	Skipped      bool
+	RemoteBody   string
+	Diff         []DiffLine
+	RemoteDiffers bool
+}
+
 // Publish creates or updates the page at space/path. Intermediate path
 // segments become parent pages when they do not exist. The last segment is
 // the page title whose body is replaced with storage.
-// created is true when the leaf page did not exist yet.
 func (c *Client) Publish(ctx context.Context, space, pagePath, storage string, versionMessage string) (page *Page, created bool, err error) {
+	res, err := c.PublishWithOptions(ctx, space, pagePath, storage, versionMessage, PublishOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	return res.Page, res.Created, nil
+}
+
+// PublishWithOptions creates or updates the page with advanced conflict detection.
+func (c *Client) PublishWithOptions(ctx context.Context, space, pagePath, storage string, versionMessage string, opts PublishOptions) (*PublishResult, error) {
 	segments := SplitPath(pagePath)
 	if len(segments) == 0 {
-		return nil, false, fmt.Errorf("path is empty")
+		return nil, fmt.Errorf("path is empty")
 	}
 
 	parentID := ""
@@ -196,7 +223,7 @@ func (c *Client) Publish(ctx context.Context, space, pagePath, storage string, v
 		leaf := i == len(segments)-1
 		existing, err := c.FindPage(ctx, space, title)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		if existing == nil {
 			body := "<p></p>"
@@ -205,28 +232,40 @@ func (c *Client) Publish(ctx context.Context, space, pagePath, storage string, v
 			}
 			newPage, err := c.CreatePage(ctx, space, title, parentID, body)
 			if err != nil {
-				return nil, false, fmt.Errorf("create page %q: %w", title, err)
+				return nil, fmt.Errorf("create page %q: %w", title, err)
 			}
 			if leaf {
-				return newPage, true, nil
+				return &PublishResult{Page: newPage, Created: true}, nil
 			}
 			parentID = newPage.ID
 			continue
 		}
 		if leaf {
-			if strings.TrimSpace(existing.Body.Storage.Value) == strings.TrimSpace(storage) {
+			remoteStorage := existing.Body.Storage.Value
+			if strings.TrimSpace(remoteStorage) == strings.TrimSpace(storage) {
 				// Page content is identical, skip remote API update
-				return existing, false, nil
+				return &PublishResult{Page: existing, Created: false, Skipped: true, RemoteBody: remoteStorage}, nil
 			}
+
+			diff := ComputeDiff(remoteStorage, storage)
+
+			if opts.DiffOnly {
+				return &PublishResult{Page: existing, Created: false, Skipped: true, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, nil
+			}
+
+			if opts.FailOnRemoteChange {
+				return &PublishResult{Page: existing, Created: false, Skipped: true, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, fmt.Errorf("remote page content has diverged from local file")
+			}
+
 			updated, err := c.UpdatePage(ctx, existing, storage, versionMessage)
 			if err != nil {
-				return nil, false, fmt.Errorf("update page %q: %w", title, err)
+				return nil, fmt.Errorf("update page %q: %w", title, err)
 			}
-			return updated, false, nil
+			return &PublishResult{Page: updated, Created: false, Skipped: false, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, nil
 		}
 		parentID = existing.ID
 	}
-	return nil, false, fmt.Errorf("publish: no leaf page")
+	return nil, fmt.Errorf("publish: no leaf page")
 }
 
 // UploadAttachment uploads a local file as a Confluence page attachment.
