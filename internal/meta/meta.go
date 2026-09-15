@@ -45,26 +45,55 @@ func parseBody(body string) Meta {
 	var m Meta
 	chunk := strings.ReplaceAll(body, "\r\n", "\n")
 	chunk = strings.ReplaceAll(chunk, ";", "\n")
-	chunk = strings.ReplaceAll(chunk, ",", "\n")
-	for _, line := range strings.Split(chunk, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
+
+	// Split by newline first
+	lines := strings.Split(chunk, "\n")
+	var items []string
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l == "" {
 			continue
 		}
-		key, value, ok := strings.Cut(line, ":")
+		// If line contains multiple key:value pairs separated by comma (e.g. "space:DOC,path:Guides,title:Getting started")
+		// split only on commas that precede a known key name.
+		parts := splitCommaKeys(l)
+		items = append(items, parts...)
+	}
+
+	for _, item := range items {
+		key, value, ok := strings.Cut(item, ":")
 		if !ok {
 			continue
 		}
+		val := strings.TrimSpace(value)
+		val = strings.TrimRight(val, ",;\r\n\t ")
 		switch normalizeKey(key) {
 		case "space":
-			m.Space = strings.TrimSpace(value)
+			m.Space = val
 		case "path":
-			m.Path = strings.TrimSpace(value)
+			m.Path = val
 		case "title":
-			m.Title = strings.TrimSpace(value)
+			m.Title = val
 		}
 	}
 	return m
+}
+
+var keyPrefixRegex = regexp.MustCompile(`,\s*(?i)(space|path|title|metadata\.[a-z]+)\s*:`)
+
+func splitCommaKeys(s string) []string {
+	locs := keyPrefixRegex.FindAllStringIndex(s, -1)
+	if len(locs) == 0 {
+		return []string{s}
+	}
+	var res []string
+	start := 0
+	for _, loc := range locs {
+		res = append(res, strings.TrimSpace(s[start:loc[0]]))
+		start = loc[0] + 1 // skip the comma
+	}
+	res = append(res, strings.TrimSpace(s[start:]))
+	return res
 }
 
 func normalizeKey(key string) string {

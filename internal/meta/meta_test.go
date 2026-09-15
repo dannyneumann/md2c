@@ -113,3 +113,28 @@ func TestDestinationTitleOnly(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestExtractEmojiPath(t *testing.T) {
+	t.Parallel()
+	in := `<!--
+space: TIKB
+path: Service - sigD/🎓 Anleitungen & Tutorials - sigD
+title: Migration sigD neue bitIAM URLs
+-->
+# Content
+`
+	got, _ := Extract(in)
+	if got.Space != "TIKB" {
+		t.Fatalf("space %q", got.Space)
+	}
+	if got.Path != "Service - sigD/🎓 Anleitungen & Tutorials - sigD" {
+		t.Fatalf("path %q", got.Path)
+	}
+	if got.Title != "Migration sigD neue bitIAM URLs" {
+		t.Fatalf("title %q", got.Title)
+	}
+	want := "Service - sigD/🎓 Anleitungen & Tutorials - sigD/Migration sigD neue bitIAM URLs"
+	if got.Destination() != want {
+		t.Fatalf("destination %q want %q", got.Destination(), want)
+	}
+}
