@@ -151,8 +151,30 @@ func (c *Client) CreatePage(ctx context.Context, space, title, parentID, storage
 	return &page, nil
 }
 
-// UpdatePage replaces the storage body of an existing page with an optional version message.
-func (c *Client) UpdatePage(ctx context.Context, page *Page, storage string, versionMessage string) (*Page, error) {
+// AddLabels attaches labels to a Confluence page.
+func (c *Client) AddLabels(ctx context.Context, pageID string, labels []string) error {
+	if len(labels) == 0 {
+		return nil
+	}
+	type labelItem struct {
+		Prefix string `json:"prefix"`
+		Name   string `json:"name"`
+	}
+	var items []labelItem
+	for _, l := range labels {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			items = append(items, labelItem{Prefix: "global", Name: l})
+		}
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	return c.do(ctx, http.MethodPost, fmt.Sprintf("/content/%s/label", url.PathEscape(pageID)), items, nil)
+}
+
+// UpdatePage replaces the storage body of an existing page with an optional version message and optional parentID (ancestors).
+func (c *Client) UpdatePage(ctx context.Context, page *Page, parentID string, storage string, versionMessage string) (*Page, error) {
 	msg := versionMessage
 	if strings.TrimSpace(msg) == "" {
 		msg = "updated by md2c"
@@ -172,6 +194,9 @@ func (c *Client) UpdatePage(ctx context.Context, page *Page, storage string, ver
 			"number":  page.Version.Number + 1,
 			"message": msg,
 		},
+	}
+	if parentID != "" {
+		body["ancestors"] = []map[string]string{{"id": parentID}}
 	}
 
 	var updated Page
@@ -235,12 +260,14 @@ func (c *Client) PublishWithOptions(ctx context.Context, space, pagePath, storag
 				return nil, fmt.Errorf("create page %q: %w", title, err)
 			}
 			if leaf {
+				_ = c.AddLabels(ctx, newPage.ID, []string{"kb-how-to-article"})
 				return &PublishResult{Page: newPage, Created: true}, nil
 			}
 			parentID = newPage.ID
 			continue
 		}
 		if leaf {
+			_ = c.AddLabels(ctx, existing.ID, []string{"kb-how-to-article"})
 			remoteStorage := existing.Body.Storage.Value
 			if NormalizeStorageHTML(remoteStorage) == NormalizeStorageHTML(storage) {
 				// Page content is identical (ignoring dynamic ac:macro-id/ac:schema-version metadata), skip remote API update
@@ -268,7 +295,7 @@ func (c *Client) PublishWithOptions(ctx context.Context, space, pagePath, storag
 				return &PublishResult{Page: existing, Created: false, Skipped: true, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, fmt.Errorf("remote page content has diverged from local file")
 			}
 
-			updated, err := c.UpdatePage(ctx, existing, storage, versionMessage)
+			updated, err := c.UpdatePage(ctx, existing, parentID, storage, versionMessage)
 			if err != nil {
 				return nil, fmt.Errorf("update page %q: %w", title, err)
 			}

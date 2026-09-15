@@ -254,6 +254,10 @@ Hello
 		case http.MethodGet:
 			_, _ = w.Write([]byte(`{"results":[],"size":0}`))
 		case http.MethodPost:
+			if strings.Contains(r.URL.Path, "/label") {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 			raw, _ := io.ReadAll(r.Body)
 			var payload map[string]any
 			_ = json.Unmarshal(raw, &payload)
