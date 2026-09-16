@@ -52,6 +52,9 @@ func TestPrintDiff(t *testing.T) {
 	PrintDiff(&buf, false, diff)
 
 	out := buf.String()
+	if !strings.Contains(out, "--- Confluence Remote (Formatted)") || !strings.Contains(out, "+++ Lokale Datei (Formatted)") {
+		t.Errorf("PrintDiff output missing formatted headers: %s", out)
+	}
 	if !strings.Contains(out, "- old") || !strings.Contains(out, "+ new") {
 		t.Errorf("PrintDiff output invalid: %s", out)
 	}
@@ -93,5 +96,10 @@ func TestNormalizeStorageHTML(t *testing.T) {
 
 	if NormalizeStorageHTML(`<span style="color: rgb(222,49,99);">text</span>`) != NormalizeStorageHTML(`<span style="color: rgb(222, 49, 99);">text</span>`) {
 		t.Fatal("NormalizeStorageHTML should ignore whitespace in rgb colors")
+	}
+
+	if got := NormalizeStorageHTML(`<p style="color: var(--accent);">Remote</p><p>Next</p>`); got != `<p style="color:var(--accent);">Remote</p>
+<p>Next</p>` {
+		t.Fatalf("NormalizeStorageHTML should normalize style whitespace and format tags, got %q", got)
 	}
 }

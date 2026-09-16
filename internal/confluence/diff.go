@@ -12,9 +12,11 @@ var (
 	reMacroID       = regexp.MustCompile(`\s+ac:macro-id="[^"]*"`)
 	reSchemaVersion = regexp.MustCompile(`\s+ac:schema-version="[^"]*"`)
 	reRGBColor      = regexp.MustCompile(`rgb\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)`)
+	reStyleColon    = regexp.MustCompile(`:\s+`)
 )
 
-// NormalizeStorageHTML strips auto-generated Confluence attributes and unescapes entities for comparison.
+// NormalizeStorageHTML strips generated attributes, normalizes equivalent HTML/CSS
+// representations, and formats storage HTML/XML one tag boundary per line.
 func NormalizeStorageHTML(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = reMacroID.ReplaceAllString(s, "")
@@ -28,6 +30,8 @@ func NormalizeStorageHTML(s string) string {
 	s = strings.ReplaceAll(s, "&lt;", "<")
 	s = strings.ReplaceAll(s, "&gt;", ">")
 	s = reRGBColor.ReplaceAllString(s, "rgb($1,$2,$3)")
+	s = reStyleColon.ReplaceAllString(s, ":")
+	s = strings.ReplaceAll(s, "><", ">\n<")
 	return strings.TrimSpace(s)
 }
 
@@ -151,8 +155,8 @@ func PrintDiff(w io.Writer, color bool, diff []DiffLine) {
 		return code + text + reset
 	}
 
-	fmt.Fprintln(w, paint(color, bold, "--- Confluence Remote"))
-	fmt.Fprintln(w, paint(color, bold, "+++ Lokale Datei"))
+	fmt.Fprintln(w, paint(color, bold, "--- Confluence Remote (Formatted)"))
+	fmt.Fprintln(w, paint(color, bold, "+++ Lokale Datei (Formatted)"))
 
 	// Find indices of changed lines ('-' or '+')
 	changedIndices := make(map[int]bool)

@@ -354,7 +354,7 @@ func TestRunPublish(t *testing.T) {
 					"number": 1,
 				},
 				"_links": map[string]string{
-					"base":  "https://acme.atlassian.net/wiki",
+					"base":  "https://example.atlassian.net/wiki",
 					"webui": "/spaces/DEV/pages/99/" + title,
 				},
 			})
@@ -382,7 +382,7 @@ func TestRunPublish(t *testing.T) {
 	if !strings.Contains(stdout.String(), "Seite angelegt") {
 		t.Fatalf("stdout %s", stdout)
 	}
-	if !strings.Contains(stdout.String(), "https://acme.atlassian.net/wiki/spaces/DEV/pages/99/Hello") {
+	if !strings.Contains(stdout.String(), "https://example.atlassian.net/wiki/spaces/DEV/pages/99/Hello") {
 		t.Fatalf("missing url: %s", stdout)
 	}
 	if strings.Contains(stdout.String(), "Seite aktualisiert") {
@@ -411,7 +411,7 @@ func TestRunPublishUpdate(t *testing.T) {
 						"number": 3,
 					},
 					"_links": map[string]string{
-						"base":  "https://acme.atlassian.net/wiki",
+						"base":  "https://example.atlassian.net/wiki",
 						"webui": "/spaces/DEV/pages/99/Hello",
 					},
 				}},
@@ -427,7 +427,7 @@ func TestRunPublishUpdate(t *testing.T) {
 					"number": 4,
 				},
 				"_links": map[string]string{
-					"base":  "https://acme.atlassian.net/wiki",
+					"base":  "https://example.atlassian.net/wiki",
 					"webui": "/spaces/DEV/pages/99/Hello",
 				},
 			})
@@ -949,16 +949,16 @@ func TestRunDiffCommand(t *testing.T) {
 
 func TestResolveTargetWithConfluenceURL(t *testing.T) {
 	t.Parallel()
-	rawURL := "https://confluence.bitmarck.de/spaces/TIKB/pages/585107318/Erstellen+eines+internen+ITSM+Changerequests"
-	m, _ := meta.Extract("<!-- space:TIKB,path:Service - Übergreifend Telematik,title:Erstellen eines internen ITSM Changerequests -->")
+	rawURL := "https://confluence.example.com/spaces/DEMO/pages/123456789/Example+ITSM+Request"
+	m, _ := meta.Extract("<!-- space:DEMO,path:Example Services,title:Example ITSM Request -->")
 	space, pagePath, err := resolveTarget(rawURL, "", m)
 	if err != nil {
 		t.Fatalf("resolveTarget failed: %v", err)
 	}
-	if space != "TIKB" {
-		t.Errorf("expected space TIKB, got %q", space)
+	if space != "DEMO" {
+		t.Errorf("expected space DEMO, got %q", space)
 	}
-	if pagePath != "Erstellen eines internen ITSM Changerequests" {
-		t.Errorf("expected pagePath 'Erstellen eines internen ITSM Changerequests', got %q", pagePath)
+	if pagePath != "Example ITSM Request" {
+		t.Errorf("expected pagePath 'Example ITSM Request', got %q", pagePath)
 	}
 }

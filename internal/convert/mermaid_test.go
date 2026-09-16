@@ -39,6 +39,32 @@ func TestMermaidToPlantUML(t *testing.T) {
 	}
 }
 
+func TestMermaidOnboardingSubgraphWithHTMLLabels(t *testing.T) {
+	t.Parallel()
+	src := "```mermaid\ngraph TD %% ------------------------------------------------------------\n%% ONBOARDING GRUPPEN & REPOSITORY MAPPING\nsubgraph ONBOARDING [\"📂 ONBOARDING-ZIELE (Hauptgruppen)\"]\n    G_EPA[\"📂 epa-betrieb\"]\n    G_TEL[\"📂 Telematik\"]\n    G_TIM[\"📂 tim\"]\n    G_CONT[\"📂 Container-Deployments<br/>(kim, inxmail, dab, kvsrouter, basisconsumer, sigd)\"]\n    G_DEV[\"📂 Single Repo: developer_assistant\"]\nend\n```\n"
+
+	got, _, err := Convert(src)
+	if err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	if !strings.Contains(got, `ac:name="plantuml"`) {
+		t.Fatalf("onboarding Mermaid should become a PlantUML macro, got:\n%s", got)
+	}
+}
+
+func TestMermaidFlowchartIgnoresDisplayDirectives(t *testing.T) {
+	t.Parallel()
+	src := "```mermaid\ngraph TD\n    A[\"Start\"] --> B[\"Ende\"]\n    style A fill:#fff\n    classDef repo fill:#eee\n    class B repo\n    linkStyle 0 stroke:#333\n    direction LR\n```\n"
+
+	got, _, err := Convert(src)
+	if err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	if !strings.Contains(got, `ac:name="plantuml"`) {
+		t.Fatalf("display directives should not force code fallback, got:\n%s", got)
+	}
+}
+
 func TestMermaidChainedEdges(t *testing.T) {
 	t.Parallel()
 	puml, ok := mermaidToPlantUML("flowchart TD\nCODE --> TESTS --> QG\n")
