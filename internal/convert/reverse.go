@@ -171,6 +171,10 @@ func (w *reverseWriter) walk(n *html.Node) {
 		case "ac:structured-macro":
 			name := getAttr(n, "ac:name")
 			switch name {
+			case "jira":
+				w.writeJiraMacro(n)
+				return
+
 			case "toc":
 				w.ensureNewline()
 				w.buf.WriteString("[TOC]\n\n")
@@ -237,6 +241,26 @@ func (w *reverseWriter) walk(n *html.Node) {
 			w.walkChildren(n)
 		}
 	}
+}
+
+func (w *reverseWriter) writeJiraMacro(n *html.Node) {
+	server := strings.TrimSpace(findParam(n, "server"))
+	columns := strings.TrimSpace(findParam(n, "columns"))
+	query := strings.TrimSpace(findParam(n, "jqlQuery"))
+
+	w.ensureNewline()
+	w.buf.WriteString("> **Jira-Makro**")
+	if server != "" {
+		fmt.Fprintf(&w.buf, " (%s)", server)
+	}
+	w.buf.WriteString("\n")
+	if columns != "" {
+		fmt.Fprintf(&w.buf, "> Spalten: `%s`\n", columns)
+	}
+	if query != "" {
+		fmt.Fprintf(&w.buf, "> JQL: `%s`\n", strings.ReplaceAll(query, "`", "'"))
+	}
+	w.buf.WriteString("\n")
 }
 
 func (w *reverseWriter) walkChildren(n *html.Node) {
