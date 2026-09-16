@@ -38,6 +38,20 @@ func TestToMarkdownCallouts(t *testing.T) {
 	}
 }
 
+func TestToMarkdownCalloutSkipsEmptyParagraphs(t *testing.T) {
+	t.Parallel()
+	xhtml := `<ac:structured-macro ac:name="info"><ac:rich-text-body><p></p><p>Die Bearbeitung erfolgt im Ticket.</p></ac:rich-text-body></ac:structured-macro>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	want := "> [!NOTE]\n> Die Bearbeitung erfolgt im Ticket.\n"
+	if got != want {
+		t.Fatalf("got:\n%q\nwant:\n%q", got, want)
+	}
+}
+
 func TestToMarkdownCodeBlock(t *testing.T) {
 	t.Parallel()
 	xhtml := `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[fmt.Println("hi")]]></ac:plain-text-body></ac:structured-macro>`

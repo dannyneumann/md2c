@@ -200,14 +200,11 @@ func (w *reverseWriter) walk(n *html.Node) {
 				case "warning":
 					marker = "WARNING"
 				}
-				w.buf.WriteString("> [!" + marker + "]\n> ")
-				oldInBQ := w.inBlockquote
-				w.inBlockquote = true
+				w.buf.WriteString("> [!" + marker + "]\n")
 				bodyNode := findChild(n, "ac:rich-text-body")
 				if bodyNode != nil {
-					w.walkChildren(bodyNode)
+					w.writeCalloutBody(bodyNode)
 				}
-				w.inBlockquote = oldInBQ
 				w.buf.WriteString("\n\n")
 				return
 
@@ -247,6 +244,21 @@ func (w *reverseWriter) walk(n *html.Node) {
 		default:
 			w.walkChildren(n)
 		}
+	}
+}
+
+func (w *reverseWriter) writeCalloutBody(n *html.Node) {
+	bodyWriter := &reverseWriter{}
+	bodyWriter.walkChildren(n)
+	for _, attachment := range bodyWriter.attachments {
+		w.addAttachment(attachment)
+	}
+	body := strings.TrimSpace(bodyWriter.buf.String())
+	if body == "" {
+		return
+	}
+	for _, line := range strings.Split(body, "\n") {
+		fmt.Fprintf(&w.buf, "> %s\n", line)
 	}
 }
 
