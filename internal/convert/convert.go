@@ -19,8 +19,9 @@ func Convert(markdown string) (string, []string, error) {
 	md := goldmark.New(goldmark.WithExtensions(extension.GFM))
 	doc := md.Parser().Parse(text.NewReader(source))
 	r := &renderer{
-		source:   source,
-		callouts: make(map[*ast.Blockquote]string),
+		source:     source,
+		callouts:   make(map[*ast.Blockquote]string),
+		jiraMacros: make(map[*ast.Blockquote]bool),
 	}
 	if err := ast.Walk(doc, r.walk); err != nil {
 		return "", nil, err
@@ -48,6 +49,7 @@ type renderer struct {
 	buf            strings.Builder
 	inHeader       bool
 	callouts       map[*ast.Blockquote]string
+	jiraMacros     map[*ast.Blockquote]bool
 	skipCalloutLen int
 	attachments    []string
 }
@@ -120,6 +122,11 @@ func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		return ast.WalkContinue, nil
 	case *ast.Blockquote:
 		if entering {
+			if macro, ok := r.detectJiraMacro(n); ok {
+				r.writeJiraMacro(macro)
+				r.jiraMacros[n] = true
+				return ast.WalkSkipChildren, nil
+			}
 			if macro, skipLen := r.detectCallout(n); macro != "" {
 				r.callouts[n] = macro
 				r.skipCalloutLen = skipLen
@@ -128,7 +135,9 @@ func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
 				r.buf.WriteString("<blockquote>")
 			}
 		} else {
-			if _, ok := r.callouts[n]; ok {
+			if _, ok := r.jiraMacros[n]; ok {
+				delete(r.jiraMacros, n)
+			} else if _, ok := r.callouts[n]; ok {
 				r.buf.WriteString("</ac:rich-text-body></ac:structured-macro>")
 				delete(r.callouts, n)
 			} else {
@@ -205,6 +214,23 @@ func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		}
 	}
 	return ast.WalkContinue, nil
+}
+
+func (r *renderer) writeJiraMacro(macro jiraMacro) {
+	r.buf.WriteString(`<ac:structured-macro ac:name="jira">`)
+	if macro.server != "" {
+		fmt.Fprintf(&r.buf, `<ac:parameter ac:name="server">%s</ac:parameter>`, escapeXML(macro.server))
+	}
+	if macro.columns != "" {
+		fmt.Fprintf(&r.buf, `<ac:parameter ac:name="columns">%s</ac:parameter>`, escapeXML(macro.columns))
+	}
+	if macro.key != "" {
+		fmt.Fprintf(&r.buf, `<ac:parameter ac:name="key">%s</ac:parameter>`, escapeXML(macro.key))
+	}
+	if macro.query != "" {
+		fmt.Fprintf(&r.buf, `<ac:parameter ac:name="jqlQuery">%s</ac:parameter>`, escapeXML(macro.query))
+	}
+	r.buf.WriteString(`</ac:structured-macro>`)
 }
 
 func (r *renderer) toggle(entering bool, tag string) {
@@ -438,3 +464,34 @@ func (r *renderer) detectCallout(n *ast.Blockquote) (macro string, skipLen int) 
 	return macro, end
 }
 
+func (r *renderer) detectJiraMacro(n *ast.Blockquote) (jiraMacro, bool) {
+	text := strings.Join(strings.Fields(r.textContent(n)), " ")
+	if !strings.HasPrefix(text, "Jira-Makro") {
+		return jiraMacro{}, false
+	}
+
+	macro := jiraMacro{}
+	header := text
+	if end := strings.Index(text, ")"); end >= 0 {
+		header = text[:end+1]
+	}
+	if open := strings.Index(header, "("); open >= 0 && strings.HasSuffix(header, ")") {
+		macro.server = strings.TrimSpace(header[open+1 : len(header)-1])
+	}
+	for label, target := range map[string]*string{
+		"Spalten:": &macro.columns,
+		"Key:":     &macro.key,
+		"JQL:":     &macro.query,
+	} {
+		if start := strings.Index(text, label); start >= 0 {
+			value := text[start+len(label):]
+			for _, next := range []string{"Spalten:", "Key:", "JQL:"} {
+				if end := strings.Index(value, next); end >= 0 {
+					value = value[:end]
+				}
+			}
+			*target = strings.Trim(strings.TrimSpace(value), "`")
+		}
+	}
+	return macro, true
+}

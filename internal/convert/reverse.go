@@ -37,6 +37,13 @@ type reverseWriter struct {
 	listTypes    []string // "ul" or "ol"
 }
 
+type jiraMacro struct {
+	server  string
+	columns string
+	key     string
+	query   string
+}
+
 func (w *reverseWriter) walk(n *html.Node) {
 	if n == nil {
 		return
@@ -246,6 +253,7 @@ func (w *reverseWriter) walk(n *html.Node) {
 func (w *reverseWriter) writeJiraMacro(n *html.Node) {
 	server := strings.TrimSpace(findParam(n, "server"))
 	columns := strings.TrimSpace(findParam(n, "columns"))
+	key := strings.TrimSpace(findParam(n, "key"))
 	query := strings.TrimSpace(findParam(n, "jqlQuery"))
 
 	w.ensureNewline()
@@ -256,6 +264,9 @@ func (w *reverseWriter) writeJiraMacro(n *html.Node) {
 	w.buf.WriteString("\n")
 	if columns != "" {
 		fmt.Fprintf(&w.buf, "> Spalten: `%s`\n", columns)
+	}
+	if key != "" {
+		fmt.Fprintf(&w.buf, "> Key: `%s`\n", strings.ReplaceAll(key, "`", "'"))
 	}
 	if query != "" {
 		fmt.Fprintf(&w.buf, "> JQL: `%s`\n", strings.ReplaceAll(query, "`", "'"))

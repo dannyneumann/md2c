@@ -156,6 +156,20 @@ func TestConvertAttachments(t *testing.T) {
 	}
 }
 
+func TestConvertJiraMacroRoundTrip(t *testing.T) {
+	t.Parallel()
+	in := "> **Jira-Makro** (BITMARCK Technik Jira)\n> Spalten: `key,summary,status`\n> Key: `TELEMATIK-3728`\n"
+
+	got, _, err := Convert(in)
+	if err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	want := `<ac:structured-macro ac:name="jira"><ac:parameter ac:name="server">BITMARCK Technik Jira</ac:parameter><ac:parameter ac:name="columns">key,summary,status</ac:parameter><ac:parameter ac:name="key">TELEMATIK-3728</ac:parameter></ac:structured-macro>`
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestInfoMacro(t *testing.T) {
 	t.Parallel()
 	got := InfoMacro("Don't edit <this>")
