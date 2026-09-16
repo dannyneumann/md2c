@@ -10,12 +10,13 @@ import (
 // ToMarkdown converts Confluence Storage Format (XHTML + macros) back to Markdown.
 // It returns the generated Markdown string and a slice of referenced attachment filenames.
 func ToMarkdown(xhtml string) (string, []string, error) {
-	doc, err := html.Parse(strings.NewReader(xhtml))
+	protected, cdata := protectCDATA(xhtml)
+	doc, err := html.Parse(strings.NewReader(protected))
 	if err != nil {
 		return "", nil, fmt.Errorf("parse xhtml: %w", err)
 	}
 
-	w := &reverseWriter{}
+	w := &reverseWriter{cdata: cdata}
 	w.walk(doc)
 
 	res := strings.TrimSpace(w.buf.String())
@@ -28,6 +29,7 @@ func ToMarkdown(xhtml string) (string, []string, error) {
 type reverseWriter struct {
 	buf          strings.Builder
 	attachments  []string
+	cdata        []string
 	inCode       bool
 	inBlockquote bool
 	inTable      bool
@@ -228,13 +230,13 @@ func (w *reverseWriter) walk(n *html.Node) {
 			case "code":
 				w.ensureNewline()
 				lang := findParam(n, "language")
-				body := findText(n, "ac:plain-text-body")
+				body := w.findText(n, "ac:plain-text-body")
 				fmt.Fprintf(&w.buf, "```%s\n%s\n```\n\n", lang, strings.TrimSuffix(body, "\n"))
 				return
 
 			case "plantuml":
 				w.ensureNewline()
-				body := findText(n, "ac:plain-text-body")
+				body := w.findText(n, "ac:plain-text-body")
 				body = strings.TrimPrefix(body, "@startuml\n")
 				body = strings.TrimSuffix(body, "\n@enduml\n")
 				body = strings.TrimSuffix(body, "@enduml\n")
@@ -397,12 +399,43 @@ func findParam(n *html.Node, paramName string) string {
 	return val
 }
 
-func findText(n *html.Node, tag string) string {
+func (w *reverseWriter) findText(n *html.Node, tag string) string {
 	target := findChild(n, tag)
 	if target != nil {
-		return stripCDATA(nodeText(target))
+		return restoreCDATA(stripCDATA(nodeText(target)), w.cdata)
 	}
 	return ""
+}
+
+func protectCDATA(xhtml string) (string, []string) {
+	const startMarker = "<![CDATA["
+	var out strings.Builder
+	var bodies []string
+	for {
+		start := strings.Index(xhtml, startMarker)
+		if start < 0 {
+			out.WriteString(xhtml)
+			break
+		}
+		out.WriteString(xhtml[:start])
+		rest := xhtml[start+len(startMarker):]
+		relEnd := strings.Index(rest, "]]>")
+		if relEnd < 0 {
+			out.WriteString(xhtml[start:])
+			break
+		}
+		bodies = append(bodies, rest[:relEnd])
+		fmt.Fprintf(&out, "MD2C_CDATA_%d_9f3a", len(bodies)-1)
+		xhtml = rest[relEnd+len("]]>"):]
+	}
+	return out.String(), bodies
+}
+
+func restoreCDATA(value string, bodies []string) string {
+	for i, body := range bodies {
+		value = strings.ReplaceAll(value, fmt.Sprintf("MD2C_CDATA_%d_9f3a", i), body)
+	}
+	return value
 }
 
 func stripCDATA(value string) string {

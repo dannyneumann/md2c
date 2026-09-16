@@ -94,6 +94,21 @@ func TestToMarkdownCodeBlock(t *testing.T) {
 	}
 }
 
+func TestToMarkdownPlantUMLPreservesCDATAArrows(t *testing.T) {
+	t.Parallel()
+	xhtml := `<ac:structured-macro ac:name="plantuml"><ac:plain-text-body><![CDATA[@startuml
+A --> B
+@enduml]]></ac:plain-text-body></ac:structured-macro>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	if !strings.Contains(got, "A --> B") {
+		t.Fatalf("PlantUML arrow was changed:\n%s", got)
+	}
+}
+
 func TestToMarkdownImageAttachment(t *testing.T) {
 	t.Parallel()
 	xhtml := `<ac:image ac:alt="Logo"><ri:attachment ri:filename="logo.png" /></ac:image>`
