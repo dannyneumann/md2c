@@ -354,7 +354,7 @@ func TestRunPublish(t *testing.T) {
 					"number": 1,
 				},
 				"_links": map[string]string{
-					"base":  "https://acme.atlassian.net/wiki",
+					"base":  "https://example.atlassian.net/wiki",
 					"webui": "/spaces/DEV/pages/99/" + title,
 				},
 			})
@@ -382,7 +382,7 @@ func TestRunPublish(t *testing.T) {
 	if !strings.Contains(stdout.String(), "Seite angelegt") {
 		t.Fatalf("stdout %s", stdout)
 	}
-	if !strings.Contains(stdout.String(), "https://acme.atlassian.net/wiki/spaces/DEV/pages/99/Hello") {
+	if !strings.Contains(stdout.String(), "https://example.atlassian.net/wiki/spaces/DEV/pages/99/Hello") {
 		t.Fatalf("missing url: %s", stdout)
 	}
 	if strings.Contains(stdout.String(), "Seite aktualisiert") {
@@ -411,7 +411,7 @@ func TestRunPublishUpdate(t *testing.T) {
 						"number": 3,
 					},
 					"_links": map[string]string{
-						"base":  "https://acme.atlassian.net/wiki",
+						"base":  "https://example.atlassian.net/wiki",
 						"webui": "/spaces/DEV/pages/99/Hello",
 					},
 				}},
@@ -427,7 +427,7 @@ func TestRunPublishUpdate(t *testing.T) {
 					"number": 4,
 				},
 				"_links": map[string]string{
-					"base":  "https://acme.atlassian.net/wiki",
+					"base":  "https://example.atlassian.net/wiki",
 					"webui": "/spaces/DEV/pages/99/Hello",
 				},
 			})
