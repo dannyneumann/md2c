@@ -139,11 +139,7 @@ func (w *reverseWriter) walk(n *html.Node) {
 
 		case "blockquote":
 			w.ensureNewline()
-			w.buf.WriteString("> ")
-			oldInBQ := w.inBlockquote
-			w.inBlockquote = true
-			w.walkChildren(n)
-			w.inBlockquote = oldInBQ
+			w.writeQuotedBody(n)
 			w.buf.WriteString("\n\n")
 
 		case "ul", "ol":
@@ -203,6 +199,9 @@ func (w *reverseWriter) walk(n *html.Node) {
 			case "toc":
 				w.ensureNewline()
 				w.buf.WriteString("[TOC]\n\n")
+				// Some Confluence responses contain an unterminated TOC macro.
+				// Continue walking its children so following page content is not lost.
+				w.walkChildren(n)
 				return
 
 			case "info", "tip", "note", "warning":
@@ -266,6 +265,10 @@ func (w *reverseWriter) walk(n *html.Node) {
 }
 
 func (w *reverseWriter) writeCalloutBody(n *html.Node) {
+	w.writeQuotedBody(n)
+}
+
+func (w *reverseWriter) writeQuotedBody(n *html.Node) {
 	bodyWriter := &reverseWriter{}
 	bodyWriter.walkChildren(n)
 	for _, attachment := range bodyWriter.attachments {
@@ -397,9 +400,17 @@ func findParam(n *html.Node, paramName string) string {
 func findText(n *html.Node, tag string) string {
 	target := findChild(n, tag)
 	if target != nil {
-		return nodeText(target)
+		return stripCDATA(nodeText(target))
 	}
 	return ""
+}
+
+func stripCDATA(value string) string {
+	value = strings.TrimPrefix(value, "<![CDATA[")
+	value = strings.TrimPrefix(value, "[CDATA[")
+	value = strings.TrimSuffix(value, "]]>")
+	value = strings.TrimSuffix(value, "]]")
+	return value
 }
 
 func findAttrValue(n *html.Node, elementTag, attrKey string) string {
