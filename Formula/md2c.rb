@@ -5,7 +5,7 @@
 class Md2c < Formula
   desc "Publish Markdown files to Confluence"
   homepage "https://github.com/dannyneumann/md2c"
-  version "0.2.19"
+  version "0.2.20"
   license "MIT"
 
   livecheck do
@@ -15,38 +15,38 @@ class Md2c < Formula
 
   on_macos do
     on_intel do
-      url "https://github.com/dannyneumann/md2c/releases/download/v0.2.19/md2c_v0.2.19_darwin_amd64", using: :nounzip
-      sha256 "eb8ded1f3a476fb2973daec09fb091052adf0a967c9153161e64031eaa3fa101"
+      url "https://github.com/dannyneumann/md2c/releases/download/v0.2.20/md2c_v0.2.20_darwin_amd64", using: :nounzip
+      sha256 "ac9dfe08817aca4cb3946c070a01f3fb42f6203d81b2a66fc390388087bf30e4"
 
       def install
-        bin.install "md2c_v0.2.19_darwin_amd64" => "md2c"
+        bin.install "md2c_v0.2.20_darwin_amd64" => "md2c"
       end
     end
     on_arm do
-      url "https://github.com/dannyneumann/md2c/releases/download/v0.2.19/md2c_v0.2.19_darwin_arm64", using: :nounzip
-      sha256 "d87f5be31bda2ede07adaae78471ac8385cdb9e8c07aa90525154daa1764659b"
+      url "https://github.com/dannyneumann/md2c/releases/download/v0.2.20/md2c_v0.2.20_darwin_arm64", using: :nounzip
+      sha256 "6c017fedca0a63cc1e5498ac41805ac4ccd92333da270ad52ca5d492c542db7f"
 
       def install
-        bin.install "md2c_v0.2.19_darwin_arm64" => "md2c"
+        bin.install "md2c_v0.2.20_darwin_arm64" => "md2c"
       end
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/dannyneumann/md2c/releases/download/v0.2.19/md2c_v0.2.19_linux_amd64", using: :nounzip
-      sha256 "203304bc055b19857b3717fa2e9412795cf144092d33866cafbba4d19bd02834"
+      url "https://github.com/dannyneumann/md2c/releases/download/v0.2.20/md2c_v0.2.20_linux_amd64", using: :nounzip
+      sha256 "321ec0052b31954905fe46ad039e50927eab53c2177de2733ae17ea39f415664"
 
       def install
-        bin.install "md2c_v0.2.19_linux_amd64" => "md2c"
+        bin.install "md2c_v0.2.20_linux_amd64" => "md2c"
       end
     end
     on_arm do
-      url "https://github.com/dannyneumann/md2c/releases/download/v0.2.19/md2c_v0.2.19_linux_arm64", using: :nounzip
-      sha256 "bdd83603daa4267fb4df82d25e6904c13408c8bad23020c0e4c58e84c7116a96"
+      url "https://github.com/dannyneumann/md2c/releases/download/v0.2.20/md2c_v0.2.20_linux_arm64", using: :nounzip
+      sha256 "ba0b080b68e128dbbc41458df49d8fb4e28924e708017b1ab5c0b5c28f33e6b8"
 
       def install
-        bin.install "md2c_v0.2.19_linux_arm64" => "md2c"
+        bin.install "md2c_v0.2.20_linux_arm64" => "md2c"
       end
     end
   end
