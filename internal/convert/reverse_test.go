@@ -67,7 +67,7 @@ func TestToMarkdownImageAttachment(t *testing.T) {
 
 func TestToMarkdownJiraMacro(t *testing.T) {
 	t.Parallel()
-	xhtml := `<ac:structured-macro ac:name="jira"><ac:parameter ac:name="server">Example Jira</ac:parameter><ac:parameter ac:name="columns">issuekey,summary,status</ac:parameter><ac:parameter ac:name="jqlQuery">key in (PROJ-123)</ac:parameter></ac:structured-macro>`
+	xhtml := `<ac:structured-macro ac:name="jira"><ac:parameter ac:name="server">Example Jira</ac:parameter><ac:parameter ac:name="columns">issuekey,summary,status</ac:parameter><ac:parameter ac:name="key">PROJ-123</ac:parameter></ac:structured-macro>`
 
 	got, _, err := ToMarkdown(xhtml)
 	if err != nil {
@@ -77,7 +77,7 @@ func TestToMarkdownJiraMacro(t *testing.T) {
 	for _, want := range []string{
 		"> **Jira-Makro** (Example Jira)",
 		"> Spalten: `issuekey,summary,status`",
-		"> JQL: `key in (PROJ-123)`",
+		"> Key: `PROJ-123`",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in:\n%s", want, got)
