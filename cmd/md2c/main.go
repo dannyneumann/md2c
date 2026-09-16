@@ -301,6 +301,7 @@ func run(args []string, rt runtime) int {
 
 	pubOpts := confluence.PublishOptions{
 		Force:              *forceFlag,
+		Interactive:        report.Enabled(rt.Stderr, rt.Getenv),
 		DiffOnly:           *diffOnlyFlag,
 		FailOnRemoteChange: *failOnRemoteChangeFlag,
 		Stdin:              os.Stdin,
@@ -354,7 +355,12 @@ func run(args []string, rt runtime) int {
 			fmt.Fprintf(rt.Stderr, "✓ Lokale Datei %s mit Confluence-Stand zusammengeführt.\n", filePath)
 			return 0
 		case confluence.ActionOverwrite:
-			// Proceed with overwrite
+			updated, updateErr := client.UpdatePage(ctx, pubRes.Page, pubRes.ParentID, body, changeReason)
+			if updateErr != nil {
+				report.Failure(rt.Stderr, colorErr, "Überschreiben fehlgeschlagen", updateErr.Error())
+				return 1
+			}
+			pubRes.Page = updated
 		}
 	}
 
