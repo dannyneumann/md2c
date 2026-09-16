@@ -170,6 +170,20 @@ func TestConvertJiraMacroRoundTrip(t *testing.T) {
 	}
 }
 
+func TestConvertTextColorRoundTrip(t *testing.T) {
+	t.Parallel()
+	in := `<span style="color: rgb(222, 49, 99);">**Rot und fett**</span> normal`
+
+	got, _, err := Convert(in)
+	if err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	want := `<p><span style="color: rgb(222, 49, 99);"><strong>Rot und fett</strong></span> normal</p>`
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestInfoMacro(t *testing.T) {
 	t.Parallel()
 	got := InfoMacro("Don't edit <this>")

@@ -50,6 +50,7 @@ type renderer struct {
 	inHeader       bool
 	callouts       map[*ast.Blockquote]string
 	jiraMacros     map[*ast.Blockquote]bool
+	colorSpanDepth int
 	skipCalloutLen int
 	attachments    []string
 }
@@ -204,7 +205,17 @@ func (r *renderer) walk(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		}
 	case *ast.RawHTML:
 		if entering {
-			r.buf.WriteString(escapeXML(r.segmentsText(n.Segments)))
+			raw := r.segmentsText(n.Segments)
+			if isColorSpanHTML(raw) {
+				r.buf.WriteString(raw)
+				if strings.HasPrefix(strings.ToLower(strings.TrimSpace(raw)), "</span") {
+					r.colorSpanDepth--
+				} else {
+					r.colorSpanDepth++
+				}
+			} else {
+				r.buf.WriteString(escapeXML(raw))
+			}
 			return ast.WalkSkipChildren, nil
 		}
 	case *ast.HTMLBlock:
@@ -367,6 +378,36 @@ func (r *renderer) linesText(n ast.Node) string {
 		b.Write(line.Value(r.source))
 	}
 	return b.String()
+}
+
+func isColorSpanHTML(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	lower := strings.ToLower(trimmed)
+	if strings.HasPrefix(lower, "</span") {
+		return true
+	}
+	if !strings.HasPrefix(lower, "<span") || !strings.Contains(lower, "style=") {
+		return false
+	}
+	return cssColorHTMLAttr(trimmed) != ""
+}
+
+func cssColorHTMLAttr(raw string) string {
+	lower := strings.ToLower(raw)
+	styleStart := strings.Index(lower, "style=")
+	if styleStart < 0 {
+		return ""
+	}
+	value := strings.TrimSpace(raw[styleStart+len("style="):])
+	if len(value) < 2 || (value[0] != '"' && value[0] != '\'') {
+		return ""
+	}
+	quote := value[0]
+	end := strings.IndexByte(value[1:], quote)
+	if end < 0 {
+		return ""
+	}
+	return cssColor(value[1 : end+1])
 }
 
 func mapLanguage(lang string) string {

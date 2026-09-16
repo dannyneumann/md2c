@@ -84,6 +84,24 @@ func (w *reverseWriter) walk(n *html.Node) {
 			w.walkChildren(n)
 			w.buf.WriteString("**")
 
+		case "span":
+			if color := cssColor(getAttr(n, "style")); color != "" {
+				fmt.Fprintf(&w.buf, `<span style="color: %s;">`, color)
+				w.walkChildren(n)
+				w.buf.WriteString("</span>")
+			} else {
+				w.walkChildren(n)
+			}
+
+		case "font":
+			if color := strings.TrimSpace(getAttr(n, "color")); color != "" {
+				fmt.Fprintf(&w.buf, `<span style="color: %s;">`, color)
+				w.walkChildren(n)
+				w.buf.WriteString("</span>")
+			} else {
+				w.walkChildren(n)
+			}
+
 		case "em", "i":
 			w.buf.WriteString("*")
 			w.walkChildren(n)
@@ -328,6 +346,16 @@ func getAttr(n *html.Node, key string) string {
 	for _, a := range n.Attr {
 		if strings.EqualFold(a.Key, key) {
 			return a.Val
+		}
+	}
+	return ""
+}
+
+func cssColor(style string) string {
+	for _, declaration := range strings.Split(style, ";") {
+		parts := strings.SplitN(declaration, ":", 2)
+		if len(parts) == 2 && strings.EqualFold(strings.TrimSpace(parts[0]), "color") {
+			return strings.TrimSpace(parts[1])
 		}
 	}
 	return ""
