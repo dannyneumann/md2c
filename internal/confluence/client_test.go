@@ -213,6 +213,37 @@ func TestPublishEmptyPath(t *testing.T) {
 	}
 }
 
+func TestPublishInteractiveDefersRemoteUpdate(t *testing.T) {
+	t.Parallel()
+	puts := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			puts++
+			t.Fatalf("interactive conflict must not update before confirmation")
+		}
+		if r.Method != http.MethodGet || r.URL.Path != "/rest/api/content" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"results": []map[string]any{pageJSON(&stored{title: "Teamregeln", body: "<p>remote</p>", version: 3, id: "42"})},
+			"size":    1,
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	res, err := testClient(srv).PublishWithOptions(context.Background(), "DEV", "Teamregeln", "<p>local</p>", "", PublishOptions{Interactive: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.RemoteDiffers || res.Page.ID != "42" {
+		t.Fatalf("unexpected result: %+v", res)
+	}
+	if puts != 0 {
+		t.Fatalf("expected no PUT, got %d", puts)
+	}
+}
+
 func TestUploadAttachment(t *testing.T) {
 	t.Parallel()
 	uploaded := false

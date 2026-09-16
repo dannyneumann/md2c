@@ -38,6 +38,47 @@ func TestToMarkdownCallouts(t *testing.T) {
 	}
 }
 
+func TestToMarkdownUnterminatedTOCPreservesFollowingContent(t *testing.T) {
+	t.Parallel()
+	xhtml := `<ac:structured-macro ac:name="toc"><h2>Following heading</h2><p>Following content</p>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	if !strings.Contains(got, "[TOC]") || !strings.Contains(got, "## Following heading") || !strings.Contains(got, "Following content") {
+		t.Fatalf("following content was lost:\n%s", got)
+	}
+}
+
+func TestToMarkdownCalloutSkipsEmptyParagraphs(t *testing.T) {
+	t.Parallel()
+	xhtml := `<ac:structured-macro ac:name="info"><ac:rich-text-body><p></p><p>Die Bearbeitung erfolgt im Ticket.</p></ac:rich-text-body></ac:structured-macro>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	want := "> [!NOTE]\n> Die Bearbeitung erfolgt im Ticket.\n"
+	if got != want {
+		t.Fatalf("got:\n%q\nwant:\n%q", got, want)
+	}
+}
+
+func TestToMarkdownBlockquote(t *testing.T) {
+	t.Parallel()
+	xhtml := `<blockquote><p>Quoted content</p></blockquote>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	want := "> Quoted content\n"
+	if got != want {
+		t.Fatalf("got:\n%q\nwant:\n%q", got, want)
+	}
+}
+
 func TestToMarkdownCodeBlock(t *testing.T) {
 	t.Parallel()
 	xhtml := `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[fmt.Println("hi")]]></ac:plain-text-body></ac:structured-macro>`
@@ -47,6 +88,24 @@ func TestToMarkdownCodeBlock(t *testing.T) {
 	}
 	if !strings.Contains(got, "```go") || !strings.Contains(got, `fmt.Println("hi")`) {
 		t.Fatalf("unexpected code block:\n%s", got)
+	}
+	if strings.Contains(got, "CDATA") {
+		t.Fatalf("CDATA wrapper leaked into Markdown:\n%s", got)
+	}
+}
+
+func TestToMarkdownPlantUMLPreservesCDATAArrows(t *testing.T) {
+	t.Parallel()
+	xhtml := `<ac:structured-macro ac:name="plantuml"><ac:plain-text-body><![CDATA[@startuml
+A --> B
+@enduml]]></ac:plain-text-body></ac:structured-macro>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	if !strings.Contains(got, "A --> B") {
+		t.Fatalf("PlantUML arrow was changed:\n%s", got)
 	}
 }
 
@@ -67,7 +126,7 @@ func TestToMarkdownImageAttachment(t *testing.T) {
 
 func TestToMarkdownJiraMacro(t *testing.T) {
 	t.Parallel()
-	xhtml := `<ac:structured-macro ac:name="jira"><ac:parameter ac:name="server">BITMARCK Technik</ac:parameter><ac:parameter ac:name="columns">issuekey,summary,status</ac:parameter><ac:parameter ac:name="jqlQuery">key in (TELEMATIK-3728)</ac:parameter></ac:structured-macro>`
+	xhtml := `<ac:structured-macro ac:name="jira"><ac:parameter ac:name="server">BITMARCK Technik</ac:parameter><ac:parameter ac:name="columns">issuekey,summary,status</ac:parameter><ac:parameter ac:name="key">TELEMATIK-3728</ac:parameter></ac:structured-macro>`
 
 	got, _, err := ToMarkdown(xhtml)
 	if err != nil {
@@ -77,7 +136,7 @@ func TestToMarkdownJiraMacro(t *testing.T) {
 	for _, want := range []string{
 		"> **Jira-Makro** (BITMARCK Technik)",
 		"> Spalten: `issuekey,summary,status`",
-		"> JQL: `key in (TELEMATIK-3728)`",
+		"> Key: `TELEMATIK-3728`",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in:\n%s", want, got)
@@ -85,5 +144,19 @@ func TestToMarkdownJiraMacro(t *testing.T) {
 	}
 	if strings.Contains(got, "Jiraissuekey") {
 		t.Fatalf("Jira storage parameters leaked into Markdown:\n%s", got)
+	}
+}
+
+func TestToMarkdownTextColor(t *testing.T) {
+	t.Parallel()
+	xhtml := `<p><span style="color: rgb(222, 49, 99);"><strong>Rot und fett</strong></span> normal</p>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	want := `<span style="color: rgb(222, 49, 99);">**Rot und fett**</span> normal`
+	if !strings.Contains(got, want) {
+		t.Fatalf("missing colored Markdown %q in:\n%s", want, got)
 	}
 }

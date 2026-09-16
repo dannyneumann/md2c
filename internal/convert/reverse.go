@@ -10,12 +10,13 @@ import (
 // ToMarkdown converts Confluence Storage Format (XHTML + macros) back to Markdown.
 // It returns the generated Markdown string and a slice of referenced attachment filenames.
 func ToMarkdown(xhtml string) (string, []string, error) {
-	doc, err := html.Parse(strings.NewReader(xhtml))
+	protected, cdata := protectCDATA(xhtml)
+	doc, err := html.Parse(strings.NewReader(protected))
 	if err != nil {
 		return "", nil, fmt.Errorf("parse xhtml: %w", err)
 	}
 
-	w := &reverseWriter{}
+	w := &reverseWriter{cdata: cdata}
 	w.walk(doc)
 
 	res := strings.TrimSpace(w.buf.String())
@@ -28,6 +29,7 @@ func ToMarkdown(xhtml string) (string, []string, error) {
 type reverseWriter struct {
 	buf          strings.Builder
 	attachments  []string
+	cdata        []string
 	inCode       bool
 	inBlockquote bool
 	inTable      bool
@@ -35,6 +37,13 @@ type reverseWriter struct {
 	currentRow   []string
 	listDepth    int
 	listTypes    []string // "ul" or "ol"
+}
+
+type jiraMacro struct {
+	server  string
+	columns string
+	key     string
+	query   string
 }
 
 func (w *reverseWriter) walk(n *html.Node) {
@@ -77,6 +86,24 @@ func (w *reverseWriter) walk(n *html.Node) {
 			w.walkChildren(n)
 			w.buf.WriteString("**")
 
+		case "span":
+			if color := cssColor(getAttr(n, "style")); color != "" {
+				fmt.Fprintf(&w.buf, `<span style="color: %s;">`, color)
+				w.walkChildren(n)
+				w.buf.WriteString("</span>")
+			} else {
+				w.walkChildren(n)
+			}
+
+		case "font":
+			if color := strings.TrimSpace(getAttr(n, "color")); color != "" {
+				fmt.Fprintf(&w.buf, `<span style="color: %s;">`, color)
+				w.walkChildren(n)
+				w.buf.WriteString("</span>")
+			} else {
+				w.walkChildren(n)
+			}
+
 		case "em", "i":
 			w.buf.WriteString("*")
 			w.walkChildren(n)
@@ -114,11 +141,7 @@ func (w *reverseWriter) walk(n *html.Node) {
 
 		case "blockquote":
 			w.ensureNewline()
-			w.buf.WriteString("> ")
-			oldInBQ := w.inBlockquote
-			w.inBlockquote = true
-			w.walkChildren(n)
-			w.inBlockquote = oldInBQ
+			w.writeQuotedBody(n)
 			w.buf.WriteString("\n\n")
 
 		case "ul", "ol":
@@ -178,6 +201,9 @@ func (w *reverseWriter) walk(n *html.Node) {
 			case "toc":
 				w.ensureNewline()
 				w.buf.WriteString("[TOC]\n\n")
+				// Some Confluence responses contain an unterminated TOC macro.
+				// Continue walking its children so following page content is not lost.
+				w.walkChildren(n)
 				return
 
 			case "info", "tip", "note", "warning":
@@ -193,27 +219,24 @@ func (w *reverseWriter) walk(n *html.Node) {
 				case "warning":
 					marker = "WARNING"
 				}
-				w.buf.WriteString("> [!" + marker + "]\n> ")
-				oldInBQ := w.inBlockquote
-				w.inBlockquote = true
+				w.buf.WriteString("> [!" + marker + "]\n")
 				bodyNode := findChild(n, "ac:rich-text-body")
 				if bodyNode != nil {
-					w.walkChildren(bodyNode)
+					w.writeCalloutBody(bodyNode)
 				}
-				w.inBlockquote = oldInBQ
 				w.buf.WriteString("\n\n")
 				return
 
 			case "code":
 				w.ensureNewline()
 				lang := findParam(n, "language")
-				body := findText(n, "ac:plain-text-body")
+				body := w.findText(n, "ac:plain-text-body")
 				fmt.Fprintf(&w.buf, "```%s\n%s\n```\n\n", lang, strings.TrimSuffix(body, "\n"))
 				return
 
 			case "plantuml":
 				w.ensureNewline()
-				body := findText(n, "ac:plain-text-body")
+				body := w.findText(n, "ac:plain-text-body")
 				body = strings.TrimPrefix(body, "@startuml\n")
 				body = strings.TrimSuffix(body, "\n@enduml\n")
 				body = strings.TrimSuffix(body, "@enduml\n")
@@ -243,9 +266,29 @@ func (w *reverseWriter) walk(n *html.Node) {
 	}
 }
 
+func (w *reverseWriter) writeCalloutBody(n *html.Node) {
+	w.writeQuotedBody(n)
+}
+
+func (w *reverseWriter) writeQuotedBody(n *html.Node) {
+	bodyWriter := &reverseWriter{}
+	bodyWriter.walkChildren(n)
+	for _, attachment := range bodyWriter.attachments {
+		w.addAttachment(attachment)
+	}
+	body := strings.TrimSpace(bodyWriter.buf.String())
+	if body == "" {
+		return
+	}
+	for _, line := range strings.Split(body, "\n") {
+		fmt.Fprintf(&w.buf, "> %s\n", line)
+	}
+}
+
 func (w *reverseWriter) writeJiraMacro(n *html.Node) {
 	server := strings.TrimSpace(findParam(n, "server"))
 	columns := strings.TrimSpace(findParam(n, "columns"))
+	key := strings.TrimSpace(findParam(n, "key"))
 	query := strings.TrimSpace(findParam(n, "jqlQuery"))
 
 	w.ensureNewline()
@@ -256,6 +299,9 @@ func (w *reverseWriter) writeJiraMacro(n *html.Node) {
 	w.buf.WriteString("\n")
 	if columns != "" {
 		fmt.Fprintf(&w.buf, "> Spalten: `%s`\n", columns)
+	}
+	if key != "" {
+		fmt.Fprintf(&w.buf, "> Key: `%s`\n", strings.ReplaceAll(key, "`", "'"))
 	}
 	if query != "" {
 		fmt.Fprintf(&w.buf, "> JQL: `%s`\n", strings.ReplaceAll(query, "`", "'"))
@@ -310,6 +356,16 @@ func getAttr(n *html.Node, key string) string {
 	return ""
 }
 
+func cssColor(style string) string {
+	for _, declaration := range strings.Split(style, ";") {
+		parts := strings.SplitN(declaration, ":", 2)
+		if len(parts) == 2 && strings.EqualFold(strings.TrimSpace(parts[0]), "color") {
+			return strings.TrimSpace(parts[1])
+		}
+	}
+	return ""
+}
+
 func findChild(n *html.Node, tag string) *html.Node {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		if c.Type == html.ElementNode {
@@ -343,12 +399,51 @@ func findParam(n *html.Node, paramName string) string {
 	return val
 }
 
-func findText(n *html.Node, tag string) string {
+func (w *reverseWriter) findText(n *html.Node, tag string) string {
 	target := findChild(n, tag)
 	if target != nil {
-		return nodeText(target)
+		return restoreCDATA(stripCDATA(nodeText(target)), w.cdata)
 	}
 	return ""
+}
+
+func protectCDATA(xhtml string) (string, []string) {
+	const startMarker = "<![CDATA["
+	var out strings.Builder
+	var bodies []string
+	for {
+		start := strings.Index(xhtml, startMarker)
+		if start < 0 {
+			out.WriteString(xhtml)
+			break
+		}
+		out.WriteString(xhtml[:start])
+		rest := xhtml[start+len(startMarker):]
+		relEnd := strings.Index(rest, "]]>")
+		if relEnd < 0 {
+			out.WriteString(xhtml[start:])
+			break
+		}
+		bodies = append(bodies, rest[:relEnd])
+		fmt.Fprintf(&out, "MD2C_CDATA_%d_9f3a", len(bodies)-1)
+		xhtml = rest[relEnd+len("]]>"):]
+	}
+	return out.String(), bodies
+}
+
+func restoreCDATA(value string, bodies []string) string {
+	for i, body := range bodies {
+		value = strings.ReplaceAll(value, fmt.Sprintf("MD2C_CDATA_%d_9f3a", i), body)
+	}
+	return value
+}
+
+func stripCDATA(value string) string {
+	value = strings.TrimPrefix(value, "<![CDATA[")
+	value = strings.TrimPrefix(value, "[CDATA[")
+	value = strings.TrimSuffix(value, "]]>")
+	value = strings.TrimSuffix(value, "]]")
+	return value
 }
 
 func findAttrValue(n *html.Node, elementTag, attrKey string) string {

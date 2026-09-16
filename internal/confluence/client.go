@@ -47,7 +47,7 @@ type Extensions struct {
 
 // MediaType holds media extension properties.
 type MediaType struct {
-	FileSize int64  `json:"fileSize"`
+	FileSize  int64  `json:"fileSize"`
 	MediaType string `json:"mediaType"`
 }
 
@@ -208,20 +208,22 @@ func (c *Client) UpdatePage(ctx context.Context, page *Page, parentID string, st
 
 // PublishOptions controls remote conflict detection and publishing behavior.
 type PublishOptions struct {
-	Force               bool // Overwrite remote content without asking
-	DiffOnly            bool // Only show diff if remote content differs, do not update
-	FailOnRemoteChange  bool // Error if remote content differs
-	Stdin               io.Reader
-	Stdout              io.Writer
+	Force              bool // Overwrite remote content without asking
+	Interactive        bool // Return remote conflicts before updating, so the caller can ask for confirmation
+	DiffOnly           bool // Only show diff if remote content differs, do not update
+	FailOnRemoteChange bool // Error if remote content differs
+	Stdin              io.Reader
+	Stdout             io.Writer
 }
 
 // PublishResult holds the outcome of a publish operation.
 type PublishResult struct {
-	Page         *Page
-	Created      bool
-	Skipped      bool
-	RemoteBody   string
-	Diff         []DiffLine
+	Page          *Page
+	ParentID      string
+	Created       bool
+	Skipped       bool
+	RemoteBody    string
+	Diff          []DiffLine
 	RemoteDiffers bool
 }
 
@@ -294,12 +296,15 @@ func (c *Client) PublishWithOptions(ctx context.Context, space, pagePath, storag
 			if opts.FailOnRemoteChange {
 				return &PublishResult{Page: existing, Created: false, Skipped: true, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, fmt.Errorf("remote page content has diverged from local file")
 			}
+			if opts.Interactive && !opts.Force {
+				return &PublishResult{Page: existing, ParentID: parentID, Created: false, Skipped: true, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, nil
+			}
 
 			updated, err := c.UpdatePage(ctx, existing, parentID, storage, versionMessage)
 			if err != nil {
 				return nil, fmt.Errorf("update page %q: %w", title, err)
 			}
-			return &PublishResult{Page: updated, Created: false, Skipped: false, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, nil
+			return &PublishResult{Page: updated, ParentID: parentID, Created: false, Skipped: false, RemoteBody: remoteStorage, Diff: diff, RemoteDiffers: true}, nil
 		}
 		parentID = existing.ID
 	}
