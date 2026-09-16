@@ -12,6 +12,7 @@ var (
 	reMacroID       = regexp.MustCompile(`\s+ac:macro-id="[^"]*"`)
 	reSchemaVersion = regexp.MustCompile(`\s+ac:schema-version="[^"]*"`)
 	reRGBColor      = regexp.MustCompile(`rgb\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)`)
+	reStyleColon    = regexp.MustCompile(`:\s+`)
 )
 
 // NormalizeStorageHTML strips auto-generated Confluence attributes and unescapes entities for comparison.
@@ -28,6 +29,8 @@ func NormalizeStorageHTML(s string) string {
 	s = strings.ReplaceAll(s, "&lt;", "<")
 	s = strings.ReplaceAll(s, "&gt;", ">")
 	s = reRGBColor.ReplaceAllString(s, "rgb($1,$2,$3)")
+	s = reStyleColon.ReplaceAllString(s, ":")
+	s = strings.ReplaceAll(s, "><", ">\n<")
 	return strings.TrimSpace(s)
 }
 

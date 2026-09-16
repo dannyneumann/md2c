@@ -94,4 +94,9 @@ func TestNormalizeStorageHTML(t *testing.T) {
 	if NormalizeStorageHTML(`<span style="color: rgb(222,49,99);">text</span>`) != NormalizeStorageHTML(`<span style="color: rgb(222, 49, 99);">text</span>`) {
 		t.Fatal("NormalizeStorageHTML should ignore whitespace in rgb colors")
 	}
+
+	if got := NormalizeStorageHTML(`<p style="color: var(--accent);">Remote</p><p>Next</p>`); got != `<p style="color:var(--accent);">Remote</p>
+<p>Next</p>` {
+		t.Fatalf("NormalizeStorageHTML should normalize style whitespace and format tags, got %q", got)
+	}
 }
