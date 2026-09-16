@@ -48,6 +48,7 @@ Aufruf (Linting / Syntax-Prüfung):
 Aufruf (Download / Pull aus Confluence):
   md2c pull <space> <pfad>
   md2c pull <confluence-url>
+  md2c pull <confluence-url> --output <datei>
 
 Aufruf (Diff remote Confluence vs. lokale Datei):
   md2c diff <datei>
@@ -152,6 +153,7 @@ func run(args []string, rt runtime) int {
 	noLint := fs.Bool("no-lint", false, "Skip automatic markdown linting")
 	showVersion := fs.Bool("version", false, "Print version and exit")
 	configPath := fs.String("config", "", "Path to md2c.conf")
+	outputPath := fs.String("output", "", "Output filename for pull/download")
 	reason := fs.String("reason", "", "Version comment/reason in Confluence history")
 	message := fs.String("message", "", "Alias for -reason")
 	installSkillFlag := fs.String("install-skill", "", "Install agent skill (agy, gemini, codex, cursor, all)")
@@ -167,7 +169,7 @@ func run(args []string, rt runtime) int {
 		if strings.HasPrefix(arg, "-") {
 			flagArgs = append(flagArgs, arg)
 			// Check if flag takes a value in next arg (e.g. --reason "text" or --config file)
-			if (arg == "--reason" || arg == "-reason" || arg == "--message" || arg == "-message" || arg == "--config" || arg == "-config" || arg == "--install-skill" || arg == "-install-skill") && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			if (arg == "--reason" || arg == "-reason" || arg == "--message" || arg == "-message" || arg == "--config" || arg == "-config" || arg == "--install-skill" || arg == "-install-skill" || arg == "--output" || arg == "-output") && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				i++
 				flagArgs = append(flagArgs, args[i])
 			}
@@ -208,7 +210,7 @@ func run(args []string, rt runtime) int {
 		return handleDiff(rest[1:], *configPath, colorOut, colorErr, rt)
 	}
 	if len(rest) >= 1 && (rest[0] == "pull" || rest[0] == "download") {
-		return handlePull(rest[1:], *configPath, colorOut, colorErr, rt)
+		return handlePull(rest[1:], *configPath, *outputPath, colorOut, colorErr, rt)
 	}
 
 	if len(rest) < 1 || len(rest) > 3 {
@@ -460,7 +462,7 @@ func resolveTarget(cliSpace, cliPath string, m meta.Meta) (space, pagePath strin
 	return "", "", fmt.Errorf("%s fehlt in der Datei — bitte angeben: md2c <datei> <space> <pfad>", strings.Join(missing, " und "))
 }
 
-func handlePull(args []string, configPath string, colorOut, colorErr bool, rt runtime) int {
+func handlePull(args []string, configPath, outputPath string, colorOut, colorErr bool, rt runtime) int {
 	if len(args) == 0 {
 		report.Failure(rt.Stderr, colorErr, "Pull-Aufruf unvollständig", "bitte Space und Pfad angeben: md2c pull <space> <pfad>")
 		return 2
@@ -522,6 +524,9 @@ func handlePull(args []string, configPath string, colorOut, colorErr bool, rt ru
 	fullContent := header + markdown
 
 	outFile := page.Title + ".md"
+	if strings.TrimSpace(outputPath) != "" {
+		outFile = outputPath
+	}
 	_, statErr := os.Stat(outFile)
 	fileExisted := statErr == nil
 
@@ -531,8 +536,10 @@ func handlePull(args []string, configPath string, colorOut, colorErr bool, rt ru
 	}
 
 	var downloadedAtts []string
+	attachmentDir := filepath.Dir(outFile)
 	for _, att := range attachments {
-		if err := client.DownloadAttachmentFile(ctx, page.ID, att, att); err != nil {
+		attPath := filepath.Join(attachmentDir, att)
+		if err := client.DownloadAttachmentFile(ctx, page.ID, att, attPath); err != nil {
 			report.Failure(rt.Stderr, colorErr, fmt.Sprintf("Attachment-Download fehlgeschlagen (%s)", att), err.Error())
 		} else {
 			downloadedAtts = append(downloadedAtts, att)

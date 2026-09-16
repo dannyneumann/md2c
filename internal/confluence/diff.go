@@ -11,6 +11,7 @@ import (
 var (
 	reMacroID       = regexp.MustCompile(`\s+ac:macro-id="[^"]*"`)
 	reSchemaVersion = regexp.MustCompile(`\s+ac:schema-version="[^"]*"`)
+	reRGBColor      = regexp.MustCompile(`rgb\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*\)`)
 )
 
 // NormalizeStorageHTML strips auto-generated Confluence attributes and unescapes entities for comparison.
@@ -26,6 +27,7 @@ func NormalizeStorageHTML(s string) string {
 	s = strings.ReplaceAll(s, "&amp;", "&")
 	s = strings.ReplaceAll(s, "&lt;", "<")
 	s = strings.ReplaceAll(s, "&gt;", ">")
+	s = reRGBColor.ReplaceAllString(s, "rgb($1,$2,$3)")
 	return strings.TrimSpace(s)
 }
 
@@ -40,7 +42,7 @@ const (
 
 // DiffLine represents a single line in unified diff formatting.
 type DiffLine struct {
-	Type    rune   // ' ', '-', '+'
+	Type    rune // ' ', '-', '+'
 	Content string
 }
 
@@ -58,22 +60,30 @@ func ComputeDiff(remoteText, localText string) []DiffLine {
 
 	i, j := 0, 0
 	for i < len(remoteLines) || j < len(localLines) {
-		if i < len(remoteLines) && j < len(localLines) && remoteLines[i] == localLines[j] {
+		if i >= len(remoteLines) {
+			diff = append(diff, DiffLine{Type: '+', Content: localLines[j]})
+			j++
+			continue
+		}
+		if j >= len(localLines) {
+			diff = append(diff, DiffLine{Type: '-', Content: remoteLines[i]})
+			i++
+			continue
+		}
+		if remoteLines[i] == localLines[j] {
 			diff = append(diff, DiffLine{Type: ' ', Content: remoteLines[i]})
 			i++
 			j++
-		} else if j < len(localLines) && (i >= len(remoteLines) || !contains(lcs, remoteLines[i])) {
-			if i < len(remoteLines) && (j >= len(localLines) || !contains(lcs, localLines[j])) {
-				diff = append(diff, DiffLine{Type: '-', Content: remoteLines[i]})
-				diff = append(diff, DiffLine{Type: '+', Content: localLines[j]})
-				i++
-				j++
-			} else {
-				diff = append(diff, DiffLine{Type: '-', Content: remoteLines[i]})
-				i++
-			}
-		} else {
+		} else if contains(lcs, remoteLines[i]) {
 			diff = append(diff, DiffLine{Type: '+', Content: localLines[j]})
+			j++
+		} else if contains(lcs, localLines[j]) {
+			diff = append(diff, DiffLine{Type: '-', Content: remoteLines[i]})
+			i++
+		} else {
+			diff = append(diff, DiffLine{Type: '-', Content: remoteLines[i]})
+			diff = append(diff, DiffLine{Type: '+', Content: localLines[j]})
+			i++
 			j++
 		}
 	}

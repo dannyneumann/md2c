@@ -30,6 +30,17 @@ func TestComputeDiff(t *testing.T) {
 	}
 }
 
+func TestComputeDiffHandlesDifferentLineCounts(t *testing.T) {
+	t.Parallel()
+	diff := ComputeDiff("<p>remote content</p>", "<p>local content</p>\n<p>second line</p>")
+	if len(diff) == 0 {
+		t.Fatal("expected non-empty diff")
+	}
+	if diff[len(diff)-1].Type != '+' {
+		t.Fatalf("expected trailing local line, got %+v", diff)
+	}
+}
+
 func TestPrintDiff(t *testing.T) {
 	diff := []DiffLine{
 		{Type: ' ', Content: "same"},
@@ -78,5 +89,9 @@ func TestNormalizeStorageHTML(t *testing.T) {
 
 	if normRemote != normLocal {
 		t.Errorf("NormalizeStorageHTML failed to equate remote and local:\nRemote: %s\nLocal:  %s", normRemote, normLocal)
+	}
+
+	if NormalizeStorageHTML(`<span style="color: rgb(222,49,99);">text</span>`) != NormalizeStorageHTML(`<span style="color: rgb(222, 49, 99);">text</span>`) {
+		t.Fatal("NormalizeStorageHTML should ignore whitespace in rgb colors")
 	}
 }
