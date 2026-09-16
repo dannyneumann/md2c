@@ -101,3 +101,17 @@ func TestToMarkdownJiraMacro(t *testing.T) {
 		t.Fatalf("Jira storage parameters leaked into Markdown:\n%s", got)
 	}
 }
+
+func TestToMarkdownTextColor(t *testing.T) {
+	t.Parallel()
+	xhtml := `<p><span style="color: rgb(222, 49, 99);"><strong>Rot und fett</strong></span> normal</p>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	want := `<span style="color: rgb(222, 49, 99);">**Rot und fett**</span> normal`
+	if !strings.Contains(got, want) {
+		t.Fatalf("missing colored Markdown %q in:\n%s", want, got)
+	}
+}
