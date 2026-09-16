@@ -38,6 +38,19 @@ func TestToMarkdownCallouts(t *testing.T) {
 	}
 }
 
+func TestToMarkdownUnterminatedTOCPreservesFollowingContent(t *testing.T) {
+	t.Parallel()
+	xhtml := `<ac:structured-macro ac:name="toc"><h2>Following heading</h2><p>Following content</p>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	if !strings.Contains(got, "[TOC]") || !strings.Contains(got, "## Following heading") || !strings.Contains(got, "Following content") {
+		t.Fatalf("following content was lost:\n%s", got)
+	}
+}
+
 func TestToMarkdownCalloutSkipsEmptyParagraphs(t *testing.T) {
 	t.Parallel()
 	xhtml := `<ac:structured-macro ac:name="info"><ac:rich-text-body><p></p><p>Die Bearbeitung erfolgt im Ticket.</p></ac:rich-text-body></ac:structured-macro>`
@@ -52,6 +65,20 @@ func TestToMarkdownCalloutSkipsEmptyParagraphs(t *testing.T) {
 	}
 }
 
+func TestToMarkdownBlockquote(t *testing.T) {
+	t.Parallel()
+	xhtml := `<blockquote><p>Quoted content</p></blockquote>`
+
+	got, _, err := ToMarkdown(xhtml)
+	if err != nil {
+		t.Fatalf("ToMarkdown: %v", err)
+	}
+	want := "> Quoted content\n"
+	if got != want {
+		t.Fatalf("got:\n%q\nwant:\n%q", got, want)
+	}
+}
+
 func TestToMarkdownCodeBlock(t *testing.T) {
 	t.Parallel()
 	xhtml := `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[fmt.Println("hi")]]></ac:plain-text-body></ac:structured-macro>`
@@ -61,6 +88,9 @@ func TestToMarkdownCodeBlock(t *testing.T) {
 	}
 	if !strings.Contains(got, "```go") || !strings.Contains(got, `fmt.Println("hi")`) {
 		t.Fatalf("unexpected code block:\n%s", got)
+	}
+	if strings.Contains(got, "CDATA") {
+		t.Fatalf("CDATA wrapper leaked into Markdown:\n%s", got)
 	}
 }
 
