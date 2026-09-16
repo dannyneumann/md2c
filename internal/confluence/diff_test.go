@@ -52,6 +52,9 @@ func TestPrintDiff(t *testing.T) {
 	PrintDiff(&buf, false, diff)
 
 	out := buf.String()
+	if !strings.Contains(out, "--- Confluence Remote (Formatted)") || !strings.Contains(out, "+++ Lokale Datei (Formatted)") {
+		t.Errorf("PrintDiff output missing formatted headers: %s", out)
+	}
 	if !strings.Contains(out, "- old") || !strings.Contains(out, "+ new") {
 		t.Errorf("PrintDiff output invalid: %s", out)
 	}

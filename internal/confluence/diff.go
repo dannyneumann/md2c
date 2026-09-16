@@ -15,7 +15,8 @@ var (
 	reStyleColon    = regexp.MustCompile(`:\s+`)
 )
 
-// NormalizeStorageHTML strips auto-generated Confluence attributes and unescapes entities for comparison.
+// NormalizeStorageHTML strips generated attributes, normalizes equivalent HTML/CSS
+// representations, and formats storage HTML/XML one tag boundary per line.
 func NormalizeStorageHTML(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = reMacroID.ReplaceAllString(s, "")
@@ -154,8 +155,8 @@ func PrintDiff(w io.Writer, color bool, diff []DiffLine) {
 		return code + text + reset
 	}
 
-	fmt.Fprintln(w, paint(color, bold, "--- Confluence Remote"))
-	fmt.Fprintln(w, paint(color, bold, "+++ Lokale Datei"))
+	fmt.Fprintln(w, paint(color, bold, "--- Confluence Remote (Formatted)"))
+	fmt.Fprintln(w, paint(color, bold, "+++ Lokale Datei (Formatted)"))
 
 	// Find indices of changed lines ('-' or '+')
 	changedIndices := make(map[int]bool)
