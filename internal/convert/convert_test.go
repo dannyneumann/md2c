@@ -156,6 +156,34 @@ func TestConvertAttachments(t *testing.T) {
 	}
 }
 
+func TestConvertJiraMacroRoundTrip(t *testing.T) {
+	t.Parallel()
+	in := "> **Jira-Makro** (Example Jira)\n> Spalten: `key,summary,status`\n> Key: `PROJ-123`\n"
+
+	got, _, err := Convert(in)
+	if err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	want := `<ac:structured-macro ac:name="jira"><ac:parameter ac:name="server">Example Jira</ac:parameter><ac:parameter ac:name="columns">key,summary,status</ac:parameter><ac:parameter ac:name="key">PROJ-123</ac:parameter></ac:structured-macro>`
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestConvertTextColorRoundTrip(t *testing.T) {
+	t.Parallel()
+	in := `<span style="color: rgb(222, 49, 99);">**Rot und fett**</span> normal`
+
+	got, _, err := Convert(in)
+	if err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	want := `<p><span style="color: rgb(222, 49, 99);"><strong>Rot und fett</strong></span> normal</p>`
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestInfoMacro(t *testing.T) {
 	t.Parallel()
 	got := InfoMacro("Don't edit <this>")
