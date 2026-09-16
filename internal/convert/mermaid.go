@@ -49,6 +49,9 @@ func mermaidToPlantUML(src string) (string, bool) {
 		if strings.HasPrefix(low, "click ") {
 			continue
 		}
+		if isIgnorableDirective(low) {
+			continue
+		}
 		line, inline := extractInlineNodes(line)
 		if len(inline) > 0 {
 			cur.nodes = append(cur.nodes, inline...)
@@ -100,6 +103,21 @@ func mermaidToPlantUML(src string) (string, bool) {
 	}
 	b.WriteString("@enduml\n")
 	return b.String(), true
+}
+
+func isIgnorableDirective(line string) bool {
+	for _, prefix := range []string{
+		"style ",
+		"classdef ",
+		"class ",
+		"linkstyle ",
+		"direction ",
+	} {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 type flowDiagram struct {
