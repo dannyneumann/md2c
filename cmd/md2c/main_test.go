@@ -135,7 +135,8 @@ func TestRunPull(t *testing.T) {
 	}
 
 	stdout, stderr := &strings.Builder{}, &strings.Builder{}
-	code := run([]string{"--config=" + confPath, "pull", "DEV", "Onboarding"}, runtime{
+	outPath := filepath.Join(dir, "renamed.md")
+	code := run([]string{"--config=" + confPath, "pull", "DEV", "Onboarding", "--output", outPath}, runtime{
 		Stdout:     stdout,
 		Stderr:     stderr,
 		HTTPClient: srv.Client(),
@@ -144,10 +145,14 @@ func TestRunPull(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d, stderr: %s", code, stderr)
 	}
-	defer os.Remove("Onboarding.md")
-
 	if !strings.Contains(stdout.String(), "PULL") {
 		t.Fatalf("stdout output missing summary: %s", stdout)
+	}
+	if _, err := os.Stat(outPath); err != nil {
+		t.Fatalf("output file was not created: %v", err)
+	}
+	if !strings.Contains(stdout.String(), outPath) {
+		t.Fatalf("custom output path missing from summary: %s", stdout)
 	}
 }
 
@@ -957,4 +962,3 @@ func TestResolveTargetWithConfluenceURL(t *testing.T) {
 		t.Errorf("expected pagePath 'Example ITSM Request', got %q", pagePath)
 	}
 }
-
