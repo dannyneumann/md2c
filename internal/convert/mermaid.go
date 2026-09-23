@@ -3,6 +3,7 @@ package convert
 import (
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -11,6 +12,9 @@ func mermaidToPlantUML(src string) (string, bool) {
 	src = strings.TrimSpace(src)
 	if src == "" {
 		return "", false
+	}
+	if isMermaidGantt(src) {
+		return mermaidGanttToPlantUML(src)
 	}
 
 	d := &flowDiagram{root: &flowGroup{id: "_root"}}
@@ -103,6 +107,92 @@ func mermaidToPlantUML(src string) (string, bool) {
 	}
 	b.WriteString("@enduml\n")
 	return b.String(), true
+}
+
+func isMermaidGantt(src string) bool {
+	for _, line := range strings.Split(src, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "%%") {
+			continue
+		}
+		return strings.EqualFold(line, "gantt") || strings.HasPrefix(strings.ToLower(line), "gantt ")
+	}
+	return false
+}
+
+// mermaidGanttToPlantUML handles explicit-date Mermaid milestones. This is the
+// subset used for expiry timelines and avoids silently publishing them as code.
+func mermaidGanttToPlantUML(src string) (string, bool) {
+	dateFormat := "YYYY-MM-DD"
+	var milestones []struct{ label, date string }
+	for _, raw := range strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "%%") {
+			continue
+		}
+		low := strings.ToLower(line)
+		switch {
+		case low == "gantt" || strings.HasPrefix(low, "gantt "):
+			continue
+		case strings.HasPrefix(low, "title "), strings.HasPrefix(low, "axisformat "),
+			strings.HasPrefix(low, "todaymarker "), strings.HasPrefix(low, "excludes "),
+			strings.HasPrefix(low, "includes "), strings.HasPrefix(low, "weekend "):
+			continue
+		case strings.HasPrefix(low, "dateformat "):
+			dateFormat = strings.TrimSpace(line[len("dateFormat "):])
+			if dateFormat != "YYYY-MM-DD" {
+				return "", false
+			}
+			continue
+		case strings.HasPrefix(low, "section "):
+			// Sections are visual grouping hints in Mermaid; timeline labels already
+			// carry the expiry year, so there is no direct PlantUML counterpart.
+			continue
+		}
+
+		colon := strings.LastIndex(line, " : ")
+		if colon < 1 {
+			return "", false
+		}
+		label := strings.TrimSpace(line[:colon])
+		fields := strings.Split(line[colon+3:], ",")
+		if len(fields) != 4 || !strings.EqualFold(strings.TrimSpace(fields[0]), "milestone") || strings.TrimSpace(fields[3]) != "0d" {
+			return "", false
+		}
+		id := strings.TrimSpace(fields[1])
+		date := strings.TrimSpace(fields[2])
+		if !isIdent(id) || !isISODate(date) || label == "" {
+			return "", false
+		}
+		milestones = append(milestones, struct{ label, date string }{label, date})
+	}
+	if len(milestones) == 0 {
+		return "", false
+	}
+	projectStart := milestones[0].date
+	for _, milestone := range milestones[1:] {
+		if milestone.date < projectStart {
+			projectStart = milestone.date
+		}
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "@startgantt\nprojectscale yearly\nProject starts %s\n", projectStart)
+	for _, milestone := range milestones {
+		label := strings.ReplaceAll(milestone.label, "]", ")")
+		label = strings.ReplaceAll(label, "[", "(")
+		fmt.Fprintf(&b, "[%s] happens %s\n", plantUMLText(label), milestone.date)
+	}
+	b.WriteString("@endgantt\n")
+	return b.String(), true
+}
+
+func isISODate(value string) bool {
+	if len(value) != len("2006-01-02") {
+		return false
+	}
+	_, err := time.Parse("2006-01-02", value)
+	return err == nil
 }
 
 func isIgnorableDirective(line string) bool {

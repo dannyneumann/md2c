@@ -39,6 +39,39 @@ func TestMermaidToPlantUML(t *testing.T) {
 	}
 }
 
+func TestMermaidGanttMilestonesToPlantUML(t *testing.T) {
+	t.Parallel()
+	src := "```mermaid\ngantt\n    title Certificate expiry\n    dateFormat YYYY-MM-DD\n    axisFormat %Y\n    todayMarker stroke:#344054,stroke-width:2px,stroke-dasharray:4\n    section 2026\n    qt.sigd-bms.de (ECC) · 2026-10-19 : milestone, cert001, 2026-10-19, 0d\n```\n"
+
+	got, _, err := Convert(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, `ac:name="plantuml"`) || !strings.Contains(got, "@startgantt") || strings.Contains(got, "@startuml") {
+		t.Fatalf("expected a PlantUML Gantt macro, got:\n%s", got)
+	}
+	if !strings.Contains(got, "[qt.sigd-bms.de (ECC) · 2026-10-19] happens 2026-10-19") || strings.Contains(got, "happens at") {
+		t.Fatalf("expected PlantUML absolute milestone syntax, got:\n%s", got)
+	}
+	if !strings.Contains(got, "Project starts 2026-10-19") {
+		t.Fatalf("expected timeline to start at its earliest milestone, got:\n%s", got)
+	}
+	if strings.Contains(got, `ac:name="code"`) {
+		t.Fatalf("Mermaid Gantt should not remain a code block:\n%s", got)
+	}
+}
+
+func TestMermaidGanttUnsupportedTaskFallsBackToCode(t *testing.T) {
+	t.Parallel()
+	got, _, err := Convert("```mermaid\ngantt\n    dateFormat YYYY-MM-DD\n    Build :active, build, 2026-01-01, 10d\n```\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, `ac:name="code"`) || strings.Contains(got, `ac:name="plantuml"`) {
+		t.Fatalf("unsupported Gantt tasks should remain code, got:\n%s", got)
+	}
+}
+
 func TestMermaidOnboardingSubgraphWithHTMLLabels(t *testing.T) {
 	t.Parallel()
 	src := "```mermaid\ngraph TD %% ------------------------------------------------------------\n%% ONBOARDING GRUPPEN & REPOSITORY MAPPING\nsubgraph ONBOARDING [\"📂 ONBOARDING-ZIELE (Hauptgruppen)\"]\n    G_EPA[\"📂 epa-betrieb\"]\n    G_TEL[\"📂 Telematik\"]\n    G_TIM[\"📂 tim\"]\n    G_CONT[\"📂 Container-Deployments<br/>(kim, inxmail, dab, kvsrouter, basisconsumer, sigd)\"]\n    G_DEV[\"📂 Single Repo: developer_assistant\"]\nend\n```\n"

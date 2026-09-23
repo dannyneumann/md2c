@@ -300,7 +300,8 @@ func isTOCMarker(s string) bool {
 
 func (r *renderer) writePlantUML(src string) {
 	src = strings.TrimSpace(src)
-	if !strings.Contains(strings.ToLower(src), "@startuml") {
+	lower := strings.ToLower(src)
+	if !strings.Contains(lower, "@startuml") && !strings.Contains(lower, "@startgantt") {
 		src = "@startuml\n" + src + "\n@enduml\n"
 	}
 	body := strings.ReplaceAll(src, "]]>", "]]]]><![CDATA[>")

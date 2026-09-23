@@ -80,7 +80,7 @@ Unterstützte Formatierungen:
       | Header 1 | Header 2 |
       | -------- | -------- |
       | Wert 1   | Wert 2   |
-  - Mermaid-Flowcharts -> Confluence PlantUML-Makro
+  - Mermaid-Flowcharts und datierte Gantt-Meilensteine -> Confluence PlantUML-Makro
   - Lokale Bilder (![alt](./bild.png)) -> Automatischer Attachment-Upload & Download
 
 Flags:
